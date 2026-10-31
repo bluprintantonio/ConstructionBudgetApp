@@ -71,6 +71,7 @@ const EMPTY_PLANNER_INPUTS = {
   salesCommissionPercent: null,
   taxesPercent: null,
   referenceSellingPrice: null,
+  premiumAdjustmentPct: null,
 };
 
 type DriveFileMetadata = {
@@ -471,6 +472,7 @@ router.get("/budget/planner-inputs", async (_req, res): Promise<void> => {
             salesCommissionPercent: row.salesCommissionPercent,
             taxesPercent: row.taxesPercent,
             referenceSellingPrice: row.referenceSellingPrice,
+            premiumAdjustmentPct: row.premiumAdjustmentPct,
           }
         : EMPTY_PLANNER_INPUTS,
     ),
@@ -502,6 +504,7 @@ router.put("/budget/planner-inputs", async (req, res): Promise<void> => {
       salesCommissionPercent: row.salesCommissionPercent,
       taxesPercent: row.taxesPercent,
       referenceSellingPrice: row.referenceSellingPrice,
+      premiumAdjustmentPct: row.premiumAdjustmentPct,
     }),
   );
 });

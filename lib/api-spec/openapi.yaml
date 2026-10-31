@@ -449,7 +449,8 @@ components:
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
         referenceSellingPrice: { type: ["number", "null"] }
-      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
+        premiumAdjustmentPct: { type: ["integer", "null"] }
+      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice, premiumAdjustmentPct]
     PlannerInputsUpdate:
       type: object
       properties:
@@ -462,7 +463,8 @@ components:
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
         referenceSellingPrice: { type: ["number", "null"] }
-      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
+        premiumAdjustmentPct: { type: ["integer", "null"] }
+      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice, premiumAdjustmentPct]
     BudgetLine:
       type: object
       properties:

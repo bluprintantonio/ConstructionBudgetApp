@@ -25,4 +25,6 @@ export interface PlannerInputsUpdate {
   taxesPercent: number | null;
   /** @nullable */
   referenceSellingPrice: number | null;
+  /** @nullable */
+  premiumAdjustmentPct: number | null;
 }

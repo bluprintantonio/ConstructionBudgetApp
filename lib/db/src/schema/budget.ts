@@ -171,4 +171,5 @@ export const plannerInputsTable = pgTable("planner_inputs", {
   salesCommissionPercent: real("sales_commission_percent"),
   taxesPercent: real("taxes_percent"),
   referenceSellingPrice: real("reference_selling_price"),
+  premiumAdjustmentPct: integer("premium_adjustment_pct"),
 });

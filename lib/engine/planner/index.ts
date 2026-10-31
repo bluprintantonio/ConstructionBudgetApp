@@ -8,6 +8,7 @@ export type PlannerInputs = {
   salesCommissionPercent: number | null;
   taxesPercent: number | null;
   referenceSellingPrice: number | null;
+  premiumAdjustmentPct: number | null;
 };
 
 export type PlannerPackResult = {
@@ -110,4 +111,16 @@ export function calculatePlanner(
     viable: netProfit === null ? null : netProfit > 0,
     costPerSquareMeter,
   };
+}
+
+export function calculatePremiumPlanner(
+  premiumCsvLines: number,
+  premiumExtras: number,
+  inputs: PlannerInputs,
+): PlannerPackResult {
+  const adjustmentPercent = inputs.premiumAdjustmentPct ?? 0;
+  const adjustedPremiumCost =
+    premiumCsvLines * (1 + adjustmentPercent / 100) + premiumExtras;
+
+  return calculatePlanner(adjustedPremiumCost, inputs);
 }

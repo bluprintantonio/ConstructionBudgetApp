@@ -15,6 +15,7 @@ import type {
 import { calculatePackTotals } from "@workspace/engine/packs";
 import {
   calculatePlanner,
+  calculatePremiumPlanner,
   type PlannerPackResult,
 } from "@workspace/engine/planner";
 
@@ -36,6 +37,11 @@ const fieldDefinitions: {
   { key: "salesCommissionPercent", label: "Sales commission (%)", step: "0.01" },
   { key: "taxesPercent", label: "Taxes (%)", step: "0.01" },
   { key: "referenceSellingPrice", label: "Reference selling price", step: "0.01" },
+  {
+    key: "premiumAdjustmentPct",
+    label: "Premium what-if adjustment (%)",
+    step: "1",
+  },
 ];
 
 const emptyDraft: PlannerDraft = {
@@ -48,6 +54,7 @@ const emptyDraft: PlannerDraft = {
   salesCommissionPercent: "",
   taxesPercent: "",
   referenceSellingPrice: "",
+  premiumAdjustmentPct: "",
 };
 
 const packDefinitions = [
@@ -79,6 +86,10 @@ function draftFromInputs(inputs: PlannerInputs): PlannerDraft {
       inputs.referenceSellingPrice == null
         ? ""
         : String(inputs.referenceSellingPrice),
+    premiumAdjustmentPct:
+      inputs.premiumAdjustmentPct == null
+        ? ""
+        : String(inputs.premiumAdjustmentPct),
   };
 }
 
@@ -95,6 +106,7 @@ function inputsFromDraft(draft: PlannerDraft): PlannerInputsUpdate {
     salesCommissionPercent: parseValue(draft.salesCommissionPercent),
     taxesPercent: parseValue(draft.taxesPercent),
     referenceSellingPrice: parseValue(draft.referenceSellingPrice),
+    premiumAdjustmentPct: parseValue(draft.premiumAdjustmentPct),
   };
 }
 
@@ -143,18 +155,29 @@ export default function PlannerPage({
     return {
       standard: calculatePlanner(packTotals.standard.total, inputs),
       eco: calculatePlanner(packTotals.eco.total, inputs),
-      premium: calculatePlanner(packTotals.premium.total, inputs),
+      premium: calculatePremiumPlanner(
+        packTotals.premium.fromCsvLines,
+        packTotals.premium.fromExtras,
+        inputs,
+      ),
     };
   }, [inputs, packTotals]);
 
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const invalidAdjustment =
+      draft.premiumAdjustmentPct.trim() !== "" &&
+      !Number.isInteger(Number(draft.premiumAdjustmentPct));
     const invalid = fieldDefinitions.some(({ key }) => {
       const value = draft[key].trim();
       return value !== "" && !Number.isFinite(Number(value));
     });
-    if (invalid) {
-      setSaveError("Enter a valid number in each completed field.");
+    if (invalid || invalidAdjustment) {
+      setSaveError(
+        invalidAdjustment
+          ? "Premium what-if adjustment must be a whole number."
+          : "Enter a valid number in each completed field.",
+      );
       setNotice("");
       return;
     }
@@ -216,6 +239,12 @@ export default function PlannerPage({
   const hasRequiredPriceError = plannerPacks.some(
     (pack) => pack.result.requiredSalePriceError,
   );
+  const premiumWhatIfNote =
+    inputs.premiumAdjustmentPct !== null &&
+    Number.isFinite(inputs.premiumAdjustmentPct) &&
+    inputs.premiumAdjustmentPct !== 0
+      ? `What-if: CSV lines adjusted by ${inputs.premiumAdjustmentPct}%`
+      : null;
   const summaryCards: {
     title: string;
     value: (result: PlannerPackResult) => string;
@@ -267,7 +296,12 @@ export default function PlannerPage({
         <form className="form-grid recent-panel" onSubmit={save}>
           {fieldDefinitions.map(({ key, label, step }) => (
             <label className="form-field" key={key}>
-              <span>{label} · ASSUMPTION</span>
+              <span>
+                {label} ·{" "}
+                {key === "premiumAdjustmentPct"
+                  ? "ASSUMPTION / WHAT-IF"
+                  : "ASSUMPTION"}
+              </span>
               <input
                 type="number"
                 step={step}
@@ -341,6 +375,9 @@ export default function PlannerPage({
                   <div className="building-name">
                     <strong>{pack.label}</strong>
                     {card.detail && <span>{card.detail(pack.result)}</span>}
+                    {pack.id === "premium" && premiumWhatIfNote && (
+                      <span>{premiumWhatIfNote}</span>
+                    )}
                   </div>
                   {hasError ? (
                     <span className="pill bad"><i />Error</span>
