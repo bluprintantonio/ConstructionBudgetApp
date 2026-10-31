@@ -527,3 +527,386 @@ a { color: inherit; text-decoration: none; }
   .error-state { flex-wrap: wrap; }
   .error-state .button { margin-left: 32px; }
 }
+
+/* Planner-only presentation styles; other pages retain their existing layout. */
+.planner-page {
+  --planner-standard: #c59535;
+  --planner-eco: #4f795e;
+  --planner-premium: #4e78a8;
+}
+.planner-pack-tab[data-pack="standard"],
+.planner-kpi[data-pack="standard"],
+.planner-waterfall[data-pack="standard"],
+.planner-viability[data-pack="standard"],
+.planner-comparison-card[data-pack="standard"],
+.planner-pack-badge[data-pack="standard"] { --planner-pack-color: var(--planner-standard); }
+.planner-pack-tab[data-pack="eco"],
+.planner-kpi[data-pack="eco"],
+.planner-waterfall[data-pack="eco"],
+.planner-viability[data-pack="eco"],
+.planner-comparison-card[data-pack="eco"],
+.planner-pack-badge[data-pack="eco"] { --planner-pack-color: var(--planner-eco); }
+.planner-pack-tab[data-pack="premium"],
+.planner-kpi[data-pack="premium"],
+.planner-waterfall[data-pack="premium"],
+.planner-viability[data-pack="premium"],
+.planner-comparison-card[data-pack="premium"],
+.planner-pack-badge[data-pack="premium"] { --planner-pack-color: var(--planner-premium); }
+
+.planner-pack-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  max-width: 720px;
+  margin: -5px 0 17px;
+}
+.planner-pack-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 43px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: 600 12px var(--app-font-sans);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.planner-pack-tab[aria-selected="true"] {
+  border-color: var(--planner-pack-color);
+  background: color-mix(in srgb, var(--planner-pack-color) 9%, hsl(var(--card)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--planner-pack-color) 25%, transparent);
+}
+.planner-pack-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--planner-pack-color);
+}
+.planner-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 19px 0 14px;
+}
+.planner-kpi {
+  min-width: 0;
+  border-top: 3px solid var(--planner-pack-color);
+}
+.planner-kpi .metric-top {
+  min-height: 28px;
+  align-items: flex-start;
+  gap: 7px;
+}
+.planner-kpi .source-col {
+  line-height: 1.45;
+}
+.planner-kpi .pill {
+  flex: 0 0 auto;
+}
+.planner-kpi-value {
+  display: block;
+  margin-top: 13px;
+  color: hsl(var(--foreground));
+  font: 700 23px var(--app-font-display);
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+.planner-outcome-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr);
+  align-items: start;
+  gap: 13px;
+  margin-top: 13px;
+}
+.planner-waterfall,
+.planner-viability {
+  min-width: 0;
+  padding: 17px;
+  border-top: 3px solid var(--planner-pack-color);
+}
+.planner-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.planner-card-heading h2 {
+  margin: 4px 0 0;
+  color: hsl(var(--foreground));
+  font: 700 17px var(--app-font-display);
+}
+.planner-pack-badge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--planner-pack-color) 12%, hsl(var(--card)));
+  color: var(--planner-pack-color);
+  font: 600 10px var(--app-font-sans);
+}
+.planner-waterfall-section + .planner-waterfall-section {
+  margin-top: 17px;
+  padding-top: 13px;
+  border-top: 1px solid hsl(var(--border));
+}
+.planner-waterfall-section h3 {
+  margin: 0 0 9px;
+  color: hsl(var(--muted-foreground));
+  font: 600 9px var(--app-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.planner-waterfall-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 72px;
+  align-items: center;
+  gap: 6px 11px;
+  padding: 7px 0 8px;
+  color: hsl(var(--foreground));
+  font-size: 11px;
+}
+.planner-waterfall-row.is-total {
+  margin-top: 3px;
+  padding-top: 10px;
+  border-top: 1px solid hsl(var(--border));
+  font-weight: 700;
+}
+.planner-waterfall-row.is-negative .planner-waterfall-amount,
+.planner-waterfall-row.is-negative .planner-waterfall-percent {
+  color: hsl(var(--muted-foreground));
+}
+.planner-waterfall-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.planner-waterfall-amount,
+.planner-waterfall-percent {
+  text-align: right;
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.planner-waterfall-percent {
+  color: hsl(var(--muted-foreground));
+}
+.planner-waterfall-track {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: hsl(var(--muted));
+}
+.planner-waterfall-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--planner-pack-color);
+}
+.planner-waterfall-row.is-negative .planner-waterfall-fill {
+  opacity: .58;
+}
+.planner-viability {
+  padding: 18px;
+}
+.planner-viability-label {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  font: 500 10px var(--app-font-mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.planner-viability-margin {
+  display: block;
+  margin-top: 5px;
+  color: var(--planner-pack-color);
+  font: 700 clamp(32px, 4vw, 46px) var(--app-font-display);
+  letter-spacing: -.05em;
+  overflow-wrap: anywhere;
+}
+.planner-viability-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 15px;
+}
+.planner-viability-stats > div {
+  padding: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  background: hsl(var(--background));
+}
+.planner-viability-stats span,
+.planner-viability-stats strong {
+  display: block;
+}
+.planner-viability-stats span {
+  margin-bottom: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 9px;
+}
+.planner-viability-stats strong {
+  font: 600 12px var(--app-font-mono);
+  overflow-wrap: anywhere;
+}
+.planner-viability-chart {
+  margin: 21px 8px 31px;
+}
+.planner-viability-track {
+  position: relative;
+  height: 8px;
+  border-radius: 99px;
+  background: hsl(var(--muted));
+}
+.planner-viability-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--planner-pack-color);
+  opacity: .66;
+}
+.planner-viability-fill.is-negative {
+  opacity: .38;
+}
+.planner-viability-marker {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  width: 2px;
+  height: 18px;
+  background: hsl(var(--foreground));
+  transform: translate(-50%, -50%);
+}
+.planner-viability-marker.is-zero {
+  width: 1px;
+  height: 14px;
+  background: hsl(var(--muted-foreground));
+}
+.planner-viability-marker.is-target {
+  width: 2px;
+  background: var(--planner-pack-color);
+}
+.planner-viability-marker.is-current {
+  width: 8px;
+  height: 8px;
+  border: 2px solid hsl(var(--card));
+  border-radius: 50%;
+  background: var(--planner-pack-color);
+}
+.planner-viability-axis-labels {
+  position: relative;
+  height: 18px;
+  margin-top: 8px;
+  color: hsl(var(--muted-foreground));
+  font: 9px var(--app-font-mono);
+}
+.planner-viability-axis-labels span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.planner-viability-warnings {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.planner-assumption-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  line-height: 1.45;
+}
+.planner-assumption-warning svg {
+  flex: 0 0 auto;
+  color: var(--planner-pack-color);
+}
+.planner-comparison {
+  margin-top: 26px;
+}
+.planner-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.planner-comparison-card {
+  min-width: 0;
+  padding: 15px;
+  border-top: 3px solid var(--planner-pack-color);
+}
+.planner-comparison-card.is-selected {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--planner-pack-color) 32%, transparent);
+}
+.planner-comparison-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.planner-comparison-heading h3 {
+  margin: 4px 0 0;
+  color: hsl(var(--foreground));
+  font: 700 16px var(--app-font-display);
+}
+.planner-comparison-heading > strong {
+  color: var(--planner-pack-color);
+  font: 600 12px var(--app-font-mono);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.planner-comparison-values {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+.planner-comparison-values > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.planner-comparison-values span {
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+.planner-comparison-values strong {
+  color: hsl(var(--foreground));
+  font: 500 10px var(--app-font-mono);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .planner-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planner-outcome-grid { grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr); }
+  .planner-comparison-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 800px) {
+  .planner-outcome-grid { grid-template-columns: 1fr; }
+  .planner-comparison-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .planner-pack-tabs { gap: 5px; }
+  .planner-pack-tab { min-height: 39px; gap: 5px; padding: 7px 5px; font-size: 10px; }
+  .planner-kpi-grid { gap: 8px; margin-top: 14px; }
+  .planner-kpi { padding: 11px; }
+  .planner-kpi .metric-top { flex-direction: column; min-height: 42px; }
+  .planner-kpi .pill { font-size: 8px; }
+  .planner-kpi-value { margin-top: 9px; font-size: 17px; }
+  .planner-waterfall,
+  .planner-viability { padding: 13px; }
+  .planner-waterfall-row { grid-template-columns: minmax(0, 1fr) auto 49px; gap: 6px; font-size: 10px; }
+  .planner-waterfall-amount,
+  .planner-waterfall-percent { font-size: 9px; }
+  .planner-comparison-grid { grid-template-columns: 1fr; }
+  .planner-comparison-card { padding: 13px; }
+  .planner-viability-margin { font-size: 36px; }
+}
