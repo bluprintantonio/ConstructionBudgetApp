@@ -278,8 +278,17 @@ components:
       type: object
       properties:
         id: { type: string }
+        code: { type: ["string", "null"] }
         category: { type: string }
         item: { type: string }
+        unit: { type: ["string", "null"] }
+        quantity: { type: ["number", "null"] }
+        standardUnitPrice: { type: ["number", "null"] }
+        standardTotal: { type: ["number", "null"] }
+        ecoUnitPrice: { type: ["number", "null"] }
+        ecoTotal: { type: ["number", "null"] }
+        premiumUnitPrice: { type: ["number", "null"] }
+        premiumTotal: { type: ["number", "null"] }
         buildingType: { type: ["string", "null"] }
         vendor: { type: ["string", "null"] }
         receitas: { type: ["number", "null"] }
@@ -293,12 +302,21 @@ components:
         sourceNote: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, category, item, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, createdAt, updatedAt]
+      required: [id, code, category, item, unit, quantity, standardUnitPrice, standardTotal, ecoUnitPrice, ecoTotal, premiumUnitPrice, premiumTotal, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, createdAt, updatedAt]
     BudgetLineInput:
       type: object
       properties:
+        code: { type: ["string", "null"] }
         category: { type: string, minLength: 1 }
         item: { type: string, minLength: 1 }
+        unit: { type: ["string", "null"] }
+        quantity: { type: ["number", "null"] }
+        standardUnitPrice: { type: ["number", "null"] }
+        standardTotal: { type: ["number", "null"] }
+        ecoUnitPrice: { type: ["number", "null"] }
+        ecoTotal: { type: ["number", "null"] }
+        premiumUnitPrice: { type: ["number", "null"] }
+        premiumTotal: { type: ["number", "null"] }
         buildingType: { type: ["string", "null"] }
         vendor: { type: ["string", "null"] }
         receitas: { type: ["number", "null"] }
@@ -314,8 +332,17 @@ components:
     BudgetLineUpdate:
       type: object
       properties:
+        code: { type: ["string", "null"] }
         category: { type: string, minLength: 1 }
         item: { type: string, minLength: 1 }
+        unit: { type: ["string", "null"] }
+        quantity: { type: ["number", "null"] }
+        standardUnitPrice: { type: ["number", "null"] }
+        standardTotal: { type: ["number", "null"] }
+        ecoUnitPrice: { type: ["number", "null"] }
+        ecoTotal: { type: ["number", "null"] }
+        premiumUnitPrice: { type: ["number", "null"] }
+        premiumTotal: { type: ["number", "null"] }
         buildingType: { type: ["string", "null"] }
         vendor: { type: ["string", "null"] }
         receitas: { type: ["number", "null"] }

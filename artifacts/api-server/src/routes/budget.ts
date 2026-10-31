@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, like } from "drizzle-orm";
 import {
   db,
   budgetLinesTable,
@@ -29,9 +29,8 @@ import {
 } from "@workspace/api-zod";
 import {
   buildingTypes,
-  seedLines,
+  seedMaterials,
   seedQuotes,
-  sourceMetrics,
   sources,
   toQuoteRow,
 } from "../lib/budget-seed";
@@ -42,24 +41,44 @@ let seedPromise: Promise<void> | undefined;
 async function ensureSeedData(): Promise<void> {
   if (!seedPromise) {
     seedPromise = (async () => {
-      const [seedMarker] = await db
+      const [quoteSeedMarker] = await db
         .select({ id: budgetMetaTable.id })
         .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "seed-v1"))
+        .where(eq(budgetMetaTable.id, "boxes-quotes-v1"))
         .limit(1);
-      if (seedMarker) return;
+      if (!quoteSeedMarker) {
+        await db.transaction(async (tx) => {
+          await tx
+            .insert(budgetQuotesTable)
+            .values(seedQuotes.map(toQuoteRow))
+            .onConflictDoNothing();
+          await tx
+            .insert(budgetMetaTable)
+            .values({ id: "boxes-quotes-v1" })
+            .onConflictDoNothing();
+        });
+      }
 
-      await db.transaction(async (tx) => {
-        await tx.insert(budgetLinesTable).values(seedLines).onConflictDoNothing();
-        await tx
-          .insert(budgetQuotesTable)
-          .values(seedQuotes.map(toQuoteRow))
-          .onConflictDoNothing();
-        await tx
-          .insert(budgetMetaTable)
-          .values({ id: "seed-v1" })
-          .onConflictDoNothing();
-      });
+      const [materialsSeedMarker] = await db
+        .select({ id: budgetMetaTable.id })
+        .from(budgetMetaTable)
+        .where(eq(budgetMetaTable.id, "materials-map-v1"))
+        .limit(1);
+      if (!materialsSeedMarker) {
+        await db.transaction(async (tx) => {
+          await tx
+            .delete(budgetLinesTable)
+            .where(like(budgetLinesTable.id, "src-%"));
+          await tx
+            .insert(budgetLinesTable)
+            .values(seedMaterials)
+            .onConflictDoNothing();
+          await tx
+            .insert(budgetMetaTable)
+            .values({ id: "materials-map-v1" })
+            .onConflictDoNothing();
+        });
+      }
     })();
   }
   await seedPromise;
@@ -90,7 +109,7 @@ function lineValues(
   data: typeof CreateBudgetLineBody._type,
 ): typeof budgetLinesTable.$inferInsert {
   return {
-    id: newId(),
+    id: data.code ? `material-${data.code.replaceAll(".", "-")}` : newId(),
     category: data.category,
     item: data.item,
     buildingType: data.buildingType ?? null,
@@ -104,6 +123,15 @@ function lineValues(
     reviewStatus: data.reviewStatus,
     sourceRow: data.sourceRow ?? null,
     sourceNote: data.sourceNote ?? null,
+    code: data.code ?? null,
+    unit: data.unit ?? null,
+    quantity: data.quantity ?? null,
+    standardUnitPrice: data.standardUnitPrice ?? null,
+    standardTotal: data.standardTotal ?? null,
+    ecoUnitPrice: data.ecoUnitPrice ?? null,
+    ecoTotal: data.ecoTotal ?? null,
+    premiumUnitPrice: data.premiumUnitPrice ?? null,
+    premiumTotal: data.premiumTotal ?? null,
   };
 }
 
@@ -132,9 +160,26 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
     db.select().from(budgetLinesTable),
     db.select().from(budgetQuotesTable),
   ]);
+  const sum = (
+    field: "ecoTotal" | "standardTotal" | "premiumTotal",
+  ) => lines.reduce((total, line) => total + (line[field] ?? 0), 0);
   res.json(
     GetBudgetDashboardResponse.parse({
-      sourceMetrics,
+      sourceMetrics: [
+        { id: "eco", label: "Eco", value: sum("ecoTotal"), sourceColumn: "Total Eco" },
+        {
+          id: "standard",
+          label: "Standard",
+          value: sum("standardTotal"),
+          sourceColumn: "Total Std",
+        },
+        {
+          id: "premium",
+          label: "Premium",
+          value: sum("premiumTotal"),
+          sourceColumn: "Total Premium",
+        },
+      ],
       lineCount: lines.length,
       quoteCount: quotes.length,
       linesNeedingReview: lines.filter((line) => line.reviewStatus === "unreviewed")
@@ -170,9 +215,21 @@ router.post("/budget/lines", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const values = lineValues(parsed.data);
+  if (values.code) {
+    const [existing] = await db
+      .select({ id: budgetLinesTable.id })
+      .from(budgetLinesTable)
+      .where(eq(budgetLinesTable.code, values.code))
+      .limit(1);
+    if (existing) {
+      res.status(409).json({ error: `Material code "${values.code}" already exists.` });
+      return;
+    }
+  }
   const [line] = await db
     .insert(budgetLinesTable)
-    .values(lineValues(parsed.data))
+    .values(values)
     .returning();
   res.status(201).json(CreateBudgetLineResponse.parse(serializeLine(line)));
 });
@@ -188,10 +245,22 @@ router.post("/budget/lines/import", async (req, res): Promise<void> => {
     });
     return;
   }
-  const lines = await db
-    .insert(budgetLinesTable)
-    .values(parsed.data.map(lineValues))
-    .returning();
+  const lines = await db.transaction(async (tx) => {
+    const saved = [];
+    for (const item of parsed.data) {
+      const values = lineValues(item);
+      const [line] = await tx
+        .insert(budgetLinesTable)
+        .values(values)
+        .onConflictDoUpdate({
+          target: budgetLinesTable.id,
+          set: { ...values, updatedAt: new Date() },
+        })
+        .returning();
+      saved.push(line);
+    }
+    return saved;
+  });
   res
     .status(201)
     .json(ImportBudgetLinesResponse.parse(lines.map(serializeLine)));

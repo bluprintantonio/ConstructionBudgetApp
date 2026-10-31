@@ -27,15 +27,16 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-- Keep the source sheet's `receitas`, `balanço`, `investimento`, and `despesas` fields distinct; do not interpret them as budget, actual, or variance without confirmation.
+- Use `boxes/mapa_quantidades.csv` as the master material and estimate source. Keep its Eco, Standard, and Premium scenarios separate.
+- Keep architectural references in `arquitetura` separate from estimate tiers; do not map them without source evidence.
 - Drive records are seeded as editable app data with links back to their source files. The initial build does not write to Drive or extract prices from PDFs.
-- EUR is the default display assumption; changing the display currency changes formatting only and does not convert values.
+- EUR is a display assumption because the master CSV has no currency field. Changing display currency changes formatting only and does not convert values.
 
 ## Product
 
-- Review the source-sheet figures and budget lines.
+- Review coded materials, quantities, and three estimate scenarios.
 - Organize supplier documents by trade, status, and building reference.
-- Edit records, import/export budget-line CSV, and open the linked Drive sources.
+- Edit materials, import/export the master CSV, and open linked Drive sources.
 
 ## User preferences
 
@@ -43,7 +44,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-- Imported figures and proposal prices are marked for review; confirm their meaning and amount against the original source.
+- The master CSV has no currency field; EUR is display-only and values are not converted.
+- Source zeroes are preserved as supplied and are not interpreted as free or excluded items.
+- Proposal PDF prices are not extracted, and Drive changes do not sync automatically.
 
 ## Pointers
 

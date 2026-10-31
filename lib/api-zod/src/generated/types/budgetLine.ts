@@ -10,8 +10,26 @@ import type { BudgetLineStatus } from './budgetLineStatus';
 
 export interface BudgetLine {
   id: string;
+  /** @nullable */
+  code: string | null;
   category: string;
   item: string;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  quantity: number | null;
+  /** @nullable */
+  standardUnitPrice: number | null;
+  /** @nullable */
+  standardTotal: number | null;
+  /** @nullable */
+  ecoUnitPrice: number | null;
+  /** @nullable */
+  ecoTotal: number | null;
+  /** @nullable */
+  premiumUnitPrice: number | null;
+  /** @nullable */
+  premiumTotal: number | null;
   /** @nullable */
   buildingType: string | null;
   /** @nullable */

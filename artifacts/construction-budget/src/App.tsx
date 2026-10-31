@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   BudgetLine, BudgetQuote, BudgetLineInput, BudgetQuoteInput,
-  BudgetLineStatus, BudgetLineReviewStatus, BudgetQuoteStatus, BudgetQuoteDocumentType,
+  BudgetQuoteStatus, BudgetQuoteDocumentType,
   useHealthCheck, useGetBudgetDashboard, useGetBudgetProjects, useGetBudgetSources,
   useGetBudgetLines, useGetBudgetQuotes, useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
@@ -19,13 +19,11 @@ import {
 } from '@workspace/api-client-react';
 
 const queryClient = new QueryClient();
-const lineStatuses = Object.values(BudgetLineStatus);
-const reviewStatuses = Object.values(BudgetLineReviewStatus);
 const quoteStatuses = Object.values(BudgetQuoteStatus);
 const documentTypes = Object.values(BudgetQuoteDocumentType);
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
-  { href: '/budget', label: 'Budget lines', icon: ClipboardList },
+  { href: '/budget', label: 'Materials map', icon: ClipboardList },
   { href: '/quotes', label: 'Quotes & documents', icon: FileCheck2 },
   { href: '/sources', label: 'Sources', icon: Link2 },
 ];
@@ -52,6 +50,8 @@ const shortDate = (value?: string | null) => value ? new Intl.DateTimeFormat('en
 const titleCase = (value?: string | null) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
 
 function parseCsvRows(input: string): string[][] {
+  const firstLine = input.split(/\r?\n/, 1)[0] || '';
+  const delimiter = (firstLine.match(/;/g) || []).length >= (firstLine.match(/,/g) || []).length ? ';' : ',';
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -69,7 +69,7 @@ function parseCsvRows(input: string): string[][] {
       }
     } else if (char === '"') {
       quoted = true;
-    } else if (char === ',') {
+    } else if (char === delimiter) {
       row.push(field);
       field = '';
     } else if (char === '\n' || char === '\r') {
@@ -90,63 +90,80 @@ function parseCsvRows(input: string): string[][] {
 
 function parseBudgetCsv(input: string): BudgetLineInput[] {
   const rows = parseCsvRows(input);
-  if (rows.length < 2) throw new Error('Add a header and at least one data row.');
+  if (rows.length < 2) throw new Error('Add the master CSV header and at least one material row.');
   const normalize = (value: string) => value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const headers = rows[0].map(normalize);
   const get = (row: string[], name: string) => {
     const index = headers.indexOf(normalize(name));
     return index < 0 ? '' : (row[index] || '').trim();
   };
-  if (!headers.includes('category') || !headers.includes('item')) {
-    throw new Error('CSV needs category and item columns. Export a template from Budget lines first.');
+  const required = ['codigo', 'capitulo', 'descricao', 'und', 'quant', 'precostd', 'totalstd', 'precoeco', 'totaleco', 'precopremium', 'totalpremium'];
+  if (required.some(header => !headers.includes(header))) {
+    throw new Error('Use the master CSV columns: Código, Capítulo, Descrição, Und., Quant., and the three price/total pairs.');
   }
   const numeric = (value: string) => {
     if (!value) return null;
-    const parsed = Number(value.replace(/\s/g, '').replace(',', '.'));
+    let cleaned = value.replace(/\s/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      cleaned = cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.') ? cleaned.replaceAll('.', '').replace(',', '.') : cleaned.replaceAll(',', '');
+    } else if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(',', '.');
+    }
+    const parsed = Number(cleaned);
     if (!Number.isFinite(parsed)) throw new Error(`Invalid number: ${value}`);
     return parsed;
   };
+  const seenCodes = new Set<string>();
   return rows.slice(1).map((row, index) => {
-    const category = get(row, 'category');
-    const item = get(row, 'item');
-    if (!category || !item) throw new Error(`Row ${index + 2} needs both category and item.`);
-    const status = get(row, 'status') || 'needs_review';
-    const reviewStatus = get(row, 'reviewStatus') || 'unreviewed';
-    if (!lineStatuses.includes(status as (typeof lineStatuses)[number])) throw new Error(`Row ${index + 2} has an unknown status.`);
-    if (!reviewStatuses.includes(reviewStatus as (typeof reviewStatuses)[number])) throw new Error(`Row ${index + 2} has an unknown review status.`);
+    const code = get(row, 'codigo');
+    const category = get(row, 'capitulo');
+    const item = get(row, 'descricao');
+    if (!code || !category || !item) throw new Error(`Row ${index + 2} needs code, chapter, and description.`);
+    if (seenCodes.has(code)) throw new Error(`Duplicate material code "${code}" in the CSV.`);
+    seenCodes.add(code);
     return {
+      code,
       category,
       item,
-      buildingType: get(row, 'buildingType') || null,
-      vendor: get(row, 'vendor') || null,
-      receitas: numeric(get(row, 'receitas')),
-      balanco: numeric(get(row, 'balanco')),
-      investimento: numeric(get(row, 'investimento')),
-      despesas: numeric(get(row, 'despesas')),
-      quoteAmount: numeric(get(row, 'quoteAmount')),
-      status: status as BudgetLineInput['status'],
-      reviewStatus: reviewStatus as BudgetLineInput['reviewStatus'],
-      sourceRow: numeric(get(row, 'sourceRow')),
-      sourceNote: get(row, 'sourceNote') || null,
+      unit: get(row, 'und') || null,
+      quantity: numeric(get(row, 'quant')),
+      standardUnitPrice: numeric(get(row, 'preco std')),
+      standardTotal: numeric(get(row, 'total std')),
+      ecoUnitPrice: numeric(get(row, 'preco eco')),
+      ecoTotal: numeric(get(row, 'total eco')),
+      premiumUnitPrice: numeric(get(row, 'preco premium')),
+      premiumTotal: numeric(get(row, 'total premium')),
+      buildingType: null,
+      vendor: null,
+      receitas: null,
+      balanco: null,
+      investimento: null,
+      despesas: null,
+      quoteAmount: null,
+      status: 'planned' as BudgetLineInput['status'],
+      reviewStatus: 'confirmed' as BudgetLineInput['reviewStatus'],
+      sourceRow: index + 2,
+      sourceNote: 'Imported from boxes/mapa_quantidades.csv; source values preserved.',
     };
   });
 }
 
 function downloadBudgetCsv(lines: BudgetLine[]) {
-  const columns: (keyof BudgetLine)[] = [
-    'category', 'item', 'buildingType', 'vendor', 'receitas', 'balanco',
-    'investimento', 'despesas', 'quoteAmount', 'status', 'reviewStatus',
-    'sourceRow', 'sourceNote',
+  const columns: [string, keyof BudgetLine][] = [
+    ['Código', 'code'], ['Capítulo', 'category'], ['Descrição', 'item'], ['Und.', 'unit'],
+    ['Quant.', 'quantity'], ['Preço Std', 'standardUnitPrice'], ['Total Std', 'standardTotal'],
+    ['Preço Eco', 'ecoUnitPrice'], ['Total Eco', 'ecoTotal'], ['Preço Premium', 'premiumUnitPrice'],
+    ['Total Premium', 'premiumTotal'],
   ];
   const escape = (value: unknown) => {
     const text = value == null ? '' : String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   };
-  const csv = [columns.map(escape).join(','), ...lines.map(line => columns.map(key => escape(line[key])).join(','))].join('\r\n');
+  const csv = [columns.map(([label]) => escape(label)).join(';'), ...lines.map(line => columns.map(([, key]) => escape(line[key])).join(';'))].join('\r\n');
   const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = href;
-  link.download = 'construction-budget-lines.csv';
+  link.download = 'mapa-quantidades.csv';
   link.click();
   URL.revokeObjectURL(href);
 }
@@ -189,7 +206,7 @@ function Shell({ children }: { children: ReactNode }) {
       </header>
       <div className="page-content">{children}</div>
       <Dialog open={helpOpen} title="A shared project record" subtitle="Fieldnotes keeps the working numbers connected to their origins." onClose={() => setHelpOpen(false)}>
-        <div className="help-content"><p><strong>Budget lines</strong> hold editable project entries and the source row when provided.</p><p><strong>Quotes & documents</strong> keep supplier details beside the linked proposal or folder.</p><p><strong>Sources</strong> show original Drive locations and building-type references without changing them.</p><div className="import-tip"><ShieldCheck size={15}/> Original source metric labels are preserved exactly as received.</div><div className="form-actions"><button className="button button-primary" onClick={() => setHelpOpen(false)}>Got it <Check size={15}/></button></div></div>
+        <div className="help-content"><p><strong>Materials map</strong> holds the coded items, quantities, and three price scenarios from the master CSV.</p><p><strong>Quotes & documents</strong> keep supplier details beside linked files from boxes.</p><p><strong>Sources</strong> keep architecture references separate from Eco, Standard, and Premium pricing.</p><div className="import-tip"><ShieldCheck size={15}/> Source labels and zero values are preserved as supplied.</div><div className="form-actions"><button className="button button-primary" onClick={() => setHelpOpen(false)}>Got it <Check size={15}/></button></div></div>
       </Dialog>
     </main>
   </div>;
@@ -209,7 +226,7 @@ function MetricTile({ label, value, sourceColumn, icon: Icon, index, currencyCod
   return <article className="metric-tile fade-up" style={{ animationDelay: `${index * 60}ms` }}>
     <div className="metric-top"><span className="metric-icon"><Icon size={17}/></span><span className="source-col">{sourceColumn}</span></div>
     <div className="metric-value">{currency(value, currencyCode)}</div><div className="metric-label">{label}</div>
-    <div className="metric-foot"><span>Pipeline sheet value</span><ArrowUpRight size={14}/></div>
+    <div className="metric-foot"><span>Sum of master CSV totals</span><ArrowUpRight size={14}/></div>
   </article>;
 }
 
@@ -232,10 +249,7 @@ function Overview() {
   const client = useQueryClient();
   const { currencyCode } = useCurrency();
   const recentLines = [...(lines.data || [])]
-    .sort((a, b) => {
-      const filled = (line: BudgetLine) => [line.receitas, line.balanco, line.investimento, line.despesas, line.quoteAmount].filter(value => value != null).length;
-      return filled(b) - filled(a);
-    })
+    .sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''))
     .slice(0, 5);
   if (dashboard.isLoading || lines.isLoading || quotes.isLoading) return <LoadingBlock/>;
   if (dashboard.isError || lines.isError || quotes.isError) return <ErrorBlock onRetry={() => { void dashboard.refetch(); void lines.refetch(); void quotes.refetch(); }}/>;
@@ -243,27 +257,27 @@ function Overview() {
   return <div>
     <PageHeader eyebrow="PROJECT CONTROL / 01" title="Project overview" description="A clear view of the numbers, proposals, and references behind your build." action={<button className="button button-secondary" onClick={() => { void client.invalidateQueries(); }}><RefreshCw size={15}/> Refresh data</button>}/>
     <section className="welcome-band">
-      <div className="welcome-copy"><span className="welcome-tag"><span/> PROJECT WORKSPACE</span><h2>Build with the<br/><em>whole picture.</em></h2><p>Budget lines, supplier proposals, and source documents — connected and ready to review together.</p>
-        <div className="welcome-actions"><Link href="/budget" className="button button-light">Review budget <ArrowRight size={15}/></Link><Link href="/quotes" className="welcome-link">Open proposals <ArrowUpRight size={15}/></Link></div>
+      <div className="welcome-copy"><span className="welcome-tag"><span/> PROJECT WORKSPACE</span><h2>Plan with the<br/><em>material map.</em></h2><p>Quantities, three estimate tiers, supplier proposals, and architectural references — organized in one place.</p>
+        <div className="welcome-actions"><Link href="/budget" className="button button-light">Explore materials <ArrowRight size={15}/></Link><Link href="/quotes" className="welcome-link">Open proposals <ArrowUpRight size={15}/></Link></div>
       </div>
       <div className="welcome-art" aria-hidden="true"><div className="art-grid"/><div className="blueprint"><div className="bp-topline"/><div className="bp-room bp-a"/><div className="bp-room bp-b"/><div className="bp-room bp-c"/><div className="bp-room bp-d"/><div className="bp-label">GROUND FLOOR / 01</div><div className="bp-dimension">NTS</div></div><div className="art-stamp">H<br/><span>PLAN SET</span></div><div className="art-coordinate">REFERENCE / A-01<br/>PROJECT DRAWING</div></div>
     </section>
-    <div className="section-heading"><div><div className="eyebrow">SOURCE SHEET SNAPSHOT</div><h2>Numbers, as supplied</h2><p className="currency-assumption">Display currency: {currencyCode} (assumed; values are not converted).</p></div><div className="section-meta"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/>{health.data?.status === 'ok' ? 'App online' : 'Source metrics'}</div></div>
-    {metrics.length ? <div className="metrics-grid">{metrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Landmark, Activity, ArrowDownRight, FileSpreadsheet][i % 4]} index={i} currencyCode={currencyCode}/>)}</div> : <div className="metric-placeholder"><FileSpreadsheet size={19}/><span>Source sheet metrics will appear here when available.</span></div>}
+    <div className="section-heading"><div><div className="eyebrow">MASTER CSV / SCENARIO TOTALS</div><h2>Estimate totals by tier</h2><p className="currency-assumption">Display currency: {currencyCode} (assumed; the CSV has no currency field).</p></div><div className="section-meta"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/>{health.data?.status === 'ok' ? 'App online' : 'Master map'}</div></div>
+    {metrics.length ? <div className="metrics-grid">{metrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div> : <div className="metric-placeholder"><FileSpreadsheet size={19}/><span>Master map totals will appear here when available.</span></div>}
     <div className="dashboard-lower">
-      <section className="panel recent-panel"><div className="panel-head"><div><div className="eyebrow">BUDGET REGISTER</div><h2>Source entries</h2></div><Link href="/budget" className="text-link">View all <ArrowRight size={14}/></Link></div>
-        {recentLines.length ? <div className="compact-list">{recentLines.map(line => <div className="compact-row" key={line.id} data-testid={`row-overview-line-${line.id}`}><div className="category-mark">{line.category.slice(0,1).toUpperCase()}</div><div className="compact-main"><strong>{line.item}</strong><span>{line.category}{line.vendor ? ` · ${line.vendor}` : ''}</span></div><div className="compact-end"><strong>{currency(line.quoteAmount, currencyCode)}</strong><StatusPill value={line.status}/></div></div>)}</div> : <EmptyState icon={ClipboardList} title="No budget lines yet" body="Add or import lines to start building a reviewable register." action={<Link href="/budget" className="text-link">Go to budget <ArrowRight size={14}/></Link>}/>}
+      <section className="panel recent-panel"><div className="panel-head"><div><div className="eyebrow">MASTER MATERIAL MAP</div><h2>First coded items</h2></div><Link href="/budget" className="text-link">View all <ArrowRight size={14}/></Link></div>
+        {recentLines.length ? <div className="compact-list">{recentLines.map(line => <div className="compact-row" key={line.id} data-testid={`row-overview-line-${line.id}`}><div className="category-mark">{line.code || 'M'}</div><div className="compact-main"><strong>{line.item}</strong><span>{line.code} · {line.category}</span></div><div className="compact-end"><strong>{currency(line.standardTotal, currencyCode)}</strong><span>Standard</span></div></div>)}</div> : <EmptyState icon={ClipboardList} title="No material rows yet" body="Import the master quantity map to organize estimate items." action={<Link href="/budget" className="text-link">Open materials map <ArrowRight size={14}/></Link>}/>}
       </section>
       <aside className="side-summary">
         <div className="summary-head"><div className="eyebrow">REVIEW QUEUE</div><span className="summary-mark"><CheckCircle2 size={17}/></span></div>
-        <div className="summary-number">{(dashboard.data?.linesNeedingReview || 0) + (dashboard.data?.quotesNeedingReview || 0)}</div><h3>Items to look over</h3><p>Unconfirmed details gathered from your source documents.</p>
-        <div className="queue-row"><span>Budget lines</span><b>{dashboard.data?.linesNeedingReview ?? 0}</b></div><div className="queue-row"><span>Supplier documents</span><b>{dashboard.data?.quotesNeedingReview ?? 0}</b></div>
+        <div className="summary-number">{(dashboard.data?.linesNeedingReview || 0) + (dashboard.data?.quotesNeedingReview || 0)}</div><h3>Supplier documents to review</h3><p>Linked proposal files from boxes are awaiting review.</p>
+        <div className="queue-row"><span>Master items</span><b>{dashboard.data?.lineCount ?? 0}</b></div><div className="queue-row"><span>Supplier documents</span><b>{dashboard.data?.quotesNeedingReview ?? 0}</b></div>
         <Link href="/quotes" className="button button-primary full-button">Open review queue <ArrowRight size={15}/></Link>
         <div className="summary-divider"/>
         <div className="project-link"><div className="project-link-icon"><BookOpen size={16}/></div><div><small>BUILDING REFERENCES</small><strong>{projects.data?.length ?? 0} linked building types</strong></div><Link href="/sources" aria-label="View source references"><ArrowUpRight size={15}/></Link></div>
       </aside>
     </div>
-    <div className="data-footnote"><ShieldCheck size={14}/> Source values retain their original labels. No budget-versus-actual interpretation is assumed.</div>
+    <div className="data-footnote"><ShieldCheck size={14}/> Tier totals sum the CSV totals exactly. Currency is assumed for display and is not stated in the source.</div>
   </div>;
 }
 
@@ -280,48 +294,60 @@ function FormActions({ onCancel, pending, label }: { onCancel: () => void; pendi
 }
 
 function BudgetPage() {
-  const query = useGetBudgetLines(); const projects = useGetBudgetProjects(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
+  const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
   const { currencyCode } = useCurrency();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
-  const [search, setSearch] = useState(''); const [filter, setFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
-  const lines = query.data || [];
-  const filtered = useMemo(() => lines.filter(l => (filter === 'all' || l.status === filter) && `${l.category} ${l.item} ${l.vendor || ''} ${l.buildingType || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, filter, search]);
+  const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
+  const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
+  const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
+  const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
   const reload = () => { void query.refetch(); void dashboard.refetch(); };
   const save = (e: FormEvent<HTMLFormElement>, line?: BudgetLine) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
-    const numeric = (key: string) => fd.get(key) === '' ? null : Number(fd.get(key));
-    const payload: BudgetLineInput = { category: String(fd.get('category') || ''), item: String(fd.get('item') || ''), buildingType: String(fd.get('buildingType') || '') || null, vendor: String(fd.get('vendor') || '') || null, receitas: numeric('receitas'), balanco: numeric('balanco'), investimento: numeric('investimento'), despesas: numeric('despesas'), quoteAmount: numeric('quoteAmount'), status: String(fd.get('status')) as BudgetLineInput['status'], reviewStatus: String(fd.get('reviewStatus')) as BudgetLineInput['reviewStatus'], sourceRow: numeric('sourceRow'), sourceNote: String(fd.get('sourceNote') || '') || null };
-    const done = () => { setCreateOpen(false); setEditing(null); setMessage(line ? 'Budget line updated.' : 'Budget line added.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); };
+    const text = (key: string) => String(fd.get(key) || '').trim();
+    const numeric = (key: string) => { const value = text(key); if (!value) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; };
+    const code = text('code');
+    if (lines.some(existing => existing.code === code && existing.id !== line?.id)) { setMessage(`Material code "${code}" already exists.`); return; }
+    const payload: BudgetLineInput = {
+      code, category: text('category'), item: text('item'), unit: text('unit'),
+      quantity: numeric('quantity'), standardUnitPrice: numeric('standardUnitPrice'), standardTotal: numeric('standardTotal'),
+      ecoUnitPrice: numeric('ecoUnitPrice'), ecoTotal: numeric('ecoTotal'), premiumUnitPrice: numeric('premiumUnitPrice'), premiumTotal: numeric('premiumTotal'),
+      buildingType: null, vendor: null, receitas: null, balanco: null, investimento: null, despesas: null, quoteAmount: null,
+      status: 'planned', reviewStatus: 'confirmed', sourceRow: line?.sourceRow ?? null, sourceNote: text('sourceNote') || null,
+    };
+    const done = () => { setCreateOpen(false); setEditing(null); setMessage(line ? 'Material updated.' : 'Material added.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); };
     line ? update.mutate({ lineId: line.id, data: payload }, { onSuccess: done }) : create.mutate({ data: payload }, { onSuccess: done });
   };
-  const confirmDelete = (line: BudgetLine) => { if (window.confirm(`Delete “${line.item}” from the budget register?`)) remove.mutate({ lineId: line.id }, { onSuccess: () => { setMessage('Budget line removed.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); } }); };
-  const importRows = (e: FormEvent) => { e.preventDefault(); try { const parsed = parseBudgetCsv(importText); importer.mutate({ data: parsed }, { onSuccess: () => { setImportOpen(false); setImportText(''); setMessage('CSV rows imported.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); }, onError: () => setMessage('The CSV could not be imported. Check the column headers and try again.') }); } catch (error) { setMessage(error instanceof Error ? error.message : 'CSV could not be read.'); } };
+  const confirmDelete = (line: BudgetLine) => { if (window.confirm(`Remove “${line.item}” from the app's material map? The Drive source will not be changed.`)) remove.mutate({ lineId: line.id }, { onSuccess: () => { setMessage('Material removed from the app.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); } }); };
+  const importRows = (e: FormEvent) => { e.preventDefault(); try { const parsed = parseBudgetCsv(importText); importer.mutate({ data: parsed }, { onSuccess: () => { setImportOpen(false); setImportText(''); setMessage('Master rows imported.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); }, onError: () => setMessage('The CSV could not be imported. Check the master headers and try again.') }); } catch (error) { setMessage(error instanceof Error ? error.message : 'CSV could not be read.'); } };
   if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
-    <PageHeader eyebrow="WORKSPACE / REGISTER" title="Budget lines" description="Keep categories, supplier figures, and original sheet references together." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines)} disabled={!lines.length}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import CSV</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add line</button></div>}/>
-    <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>REGISTERED LINES</span></div><div className="register-stat"><strong>{dashboard.data?.linesNeedingReview ?? 0}</strong><span>NEED REVIEW</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Financial columns are shown with their original source names.</span></div></div>
+    <PageHeader eyebrow="WORKSPACE / MASTER MAP" title="Materials & quantities" description="Coded items from the master CSV, with Eco, Standard, and Premium price tiers." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines)} disabled={!lines.length}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div>}/>
+    <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
     <section className="panel register-panel">
-      <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search budget lines" data-testid="input-search-budget-lines" placeholder="Search items, vendors, categories…" value={search} onChange={e => setSearch(e.target.value)}/><kbd>⌘ K</kbd></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by status" value={filter} onChange={e => setFilter(e.target.value)} data-testid="select-budget-status"><option value="all">All statuses</option>{lineStatuses.map(s => <option value={s} key={s}>{titleCase(s)}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
-      <div className="table-scroll scrollbar-thin"><table className="data-table budget-table"><thead><tr><th>LINE ITEM</th><th>BUILDING TYPE</th><th>VENDOR</th><th>RECEITAS</th><th>BALANÇO</th><th>INVESTIMENTO</th><th>DESPESAS</th><th>QUOTE</th><th>STATUS</th><th>SOURCE</th><th/></tr></thead><tbody>
-      {filtered.map(line => <tr key={line.id} data-testid={`row-budget-line-${line.id}`}><td><div className="item-cell"><span className="line-marker"/><div><strong>{line.item}</strong><small>{line.category}</small></div></div></td><td>{line.buildingType || <span className="muted-dash">—</span>}</td><td>{line.vendor || <span className="muted-dash">—</span>}</td><td className="money-cell">{currency(line.receitas, currencyCode)}</td><td className="money-cell">{currency(line.balanco, currencyCode)}</td><td className="money-cell">{currency(line.investimento, currencyCode)}</td><td className="money-cell">{currency(line.despesas, currencyCode)}</td><td className="money-cell quote-money">{currency(line.quoteAmount, currencyCode)}</td><td><StatusPill value={line.status}/></td><td>{line.sourceRow ? <span className="source-ref"><FileSpreadsheet size={13}/> Row {line.sourceRow}</span> : <span className="muted-dash">—</span>}</td><td><div className="row-actions"><button className="icon-button small" title="Edit line" aria-label={`Edit ${line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Delete line" aria-label={`Delete ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td></tr>)}
-      {!filtered.length && <tr><td colSpan={11}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching lines' : 'Your register is ready'} body={lines.length ? 'Try a different search or status filter.' : 'Add a line or import source records to begin.'} action={!lines.length ? <button className="text-link" onClick={() => setCreateOpen(true)}>Add the first line <ArrowRight size={14}/></button> : undefined}/></td></tr>}
+      <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
+      <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div><div className="table-scroll scrollbar-thin"><table className="data-table budget-table materials-table"><thead><tr><th>CODE</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th>ECO</th><th>STANDARD</th><th>PREMIUM</th><th/></tr></thead><tbody>
+      {filtered.map(line => <tr key={line.id} data-testid={`row-budget-line-${line.id}`}><td><span className="material-code">{line.code || '—'}</span></td><td className="material-chapter">{line.category}</td><td><strong>{line.item}</strong></td><td>{line.unit || '—'}</td><td className="money-cell">{line.quantity ?? '—'}</td><td className="material-scenario"><small>Unit: {currency(line.ecoUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.ecoTotal, currencyCode)}</strong></td><td className="material-scenario"><small>Unit: {currency(line.standardUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.standardTotal, currencyCode)}</strong></td><td className="material-scenario"><small>Unit: {currency(line.premiumUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.premiumTotal, currencyCode)}</strong></td><td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td></tr>)}
+      {!filtered.length && <tr><td colSpan={9}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
       </tbody></table></div>
-      <div className="table-footer"><span>Showing {filtered.length} of {lines.length} lines</span><span><span className="footer-dot"/>Source reference retained</span></div>
+      <div className="table-footer"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
     </section>
-    <div className="data-footnote"><CircleHelp size={14}/> Source columns remain distinct. Labels are not interpreted as budget, actual, or variance.</div>
-    <Dialog open={createOpen || !!editing} title={editing ? 'Edit budget line' : 'Add a budget line'} subtitle="Keep the source values and review status traceable." onClose={() => { setCreateOpen(false); setEditing(null); }}>
+    <div className="data-footnote"><CircleHelp size={14}/> The CSV has no currency field; amounts are formatted in the selected display currency without conversion. A source value of 0 is preserved and is not interpreted as a free item.</div>
+    <Dialog open={createOpen || !!editing} title={editing ? 'Edit material' : 'Add material'} subtitle="Keep the source code, quantities, and three scenarios together." onClose={() => { setCreateOpen(false); setEditing(null); }}>
       <form className="form-grid" onSubmit={e => save(e, editing || undefined)}>
-        <Field label="Category"><input required name="category" defaultValue={editing?.category || ''} placeholder="e.g. Exterior works"/></Field><Field label="Line item"><input required name="item" defaultValue={editing?.item || ''} placeholder="Describe the work or material"/></Field>
-        <Field label="Building type"><select name="buildingType" defaultValue={editing?.buildingType || ''}><option value="">Not specified</option>{projects.data?.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select></Field><Field label="Vendor"><input name="vendor" defaultValue={editing?.vendor || ''} placeholder="Supplier or contractor"/></Field>
-        {(['receitas','balanco','investimento','despesas','quoteAmount'] as const).map(k => <Field label={k === 'quoteAmount' ? 'Quote amount' : k.toUpperCase()} key={k}><input type="number" step="0.01" name={k} defaultValue={editing?.[k] ?? ''} placeholder="—"/></Field>)}
-        <Field label="Line status"><select name="status" defaultValue={editing?.status || 'planned'}>{lineStatuses.map(s => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field><Field label="Review status"><select name="reviewStatus" defaultValue={editing?.reviewStatus || 'unreviewed'}>{reviewStatuses.map(s => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
-        <Field label="Source row" ><input name="sourceRow" type="number" min="1" defaultValue={editing?.sourceRow ?? ''} placeholder="Row number, if known"/></Field><Field label="Source note"><input name="sourceNote" defaultValue={editing?.sourceNote || ''} placeholder="Context from the original sheet"/></Field>
-        <FormActions onCancel={() => { setCreateOpen(false); setEditing(null); }} pending={create.isPending || update.isPending} label={editing ? 'Save changes' : 'Add line'}/>
+        <Field label="Code"><input required name="code" readOnly={!!editing} defaultValue={editing?.code || ''} placeholder="e.g. 1.1"/></Field><Field label="Unit"><input required name="unit" defaultValue={editing?.unit || ''} placeholder="m2, ml, un…"/></Field>
+        <Field label="Chapter" wide><input required name="category" defaultValue={editing?.category || ''} placeholder="CAP. 1 Terraplenagens"/></Field><Field label="Description" wide><input required name="item" defaultValue={editing?.item || ''} placeholder="Material or work description"/></Field>
+        <Field label="Quantity"><input required min="0" type="number" step="0.001" name="quantity" defaultValue={editing?.quantity ?? ''}/></Field>
+        <Field label="Eco unit price"><input min="0" type="number" step="0.01" name="ecoUnitPrice" defaultValue={editing?.ecoUnitPrice ?? ''}/></Field><Field label="Eco total"><input min="0" type="number" step="0.01" name="ecoTotal" defaultValue={editing?.ecoTotal ?? ''}/></Field>
+        <Field label="Standard unit price"><input min="0" type="number" step="0.01" name="standardUnitPrice" defaultValue={editing?.standardUnitPrice ?? ''}/></Field><Field label="Standard total"><input min="0" type="number" step="0.01" name="standardTotal" defaultValue={editing?.standardTotal ?? ''}/></Field>
+        <Field label="Premium unit price"><input min="0" type="number" step="0.01" name="premiumUnitPrice" defaultValue={editing?.premiumUnitPrice ?? ''}/></Field><Field label="Premium total"><input min="0" type="number" step="0.01" name="premiumTotal" defaultValue={editing?.premiumTotal ?? ''}/></Field>
+        <Field label="Source note" wide><textarea name="sourceNote" rows={2} defaultValue={editing?.sourceNote || ''} placeholder="Source context"/></Field>
+        <FormActions onCancel={() => { setCreateOpen(false); setEditing(null); }} pending={create.isPending || update.isPending} label={editing ? 'Save material' : 'Add material'}/>
       </form>
     </Dialog>
-    <Dialog open={importOpen} title="Import budget CSV" subtitle="Use the exported headers so source fields remain in the right columns." onClose={() => setImportOpen(false)}>
-      <form onSubmit={importRows} className="import-form"><Field label="Choose CSV file" wide><input type="file" accept=".csv,text/csv" data-testid="input-budget-csv" onChange={event => { const file = event.target.files?.[0]; if (file) void file.text().then(setImportText).catch(() => setMessage('Could not read that file.')); }}/></Field><Field label="Or paste CSV rows" wide><textarea rows={8} value={importText} onChange={e => setImportText(e.target.value)} placeholder="category,item,buildingType,vendor,receitas,balanco,investimento,despesas,quoteAmount,status,reviewStatus,sourceRow,sourceNote" /></Field><div className="import-tip"><FileSpreadsheet size={15}/> Required columns: category and item. Blank numeric fields stay empty.</div><FormActions onCancel={() => setImportOpen(false)} pending={importer.isPending} label="Import records"/></form>
+    <Dialog open={importOpen} title="Import master quantity CSV" subtitle="Uses the source file's semicolon delimiter and Portuguese column headings." onClose={() => setImportOpen(false)}>
+      <form onSubmit={importRows} className="import-form"><Field label="Choose CSV file" wide><input type="file" accept=".csv,text/csv" data-testid="input-budget-csv" onChange={event => { const file = event.target.files?.[0]; if (file) void file.text().then(setImportText).catch(() => setMessage('Could not read that file.')); }}/></Field><Field label="Or paste CSV rows" wide><textarea rows={8} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Código;Capítulo;Descrição;Und.;Quant.;Preço Std;Total Std;Preço Eco;Total Eco;Preço Premium;Total Premium"/></Field><div className="import-tip"><FileSpreadsheet size={15}/> Existing codes are intended to update the corresponding material row.</div><FormActions onCancel={() => setImportOpen(false)} pending={importer.isPending} label="Import materials"/></form>
     </Dialog>
   </div>;
 }
@@ -378,13 +404,13 @@ function SourcesPage() {
   if (sources.isLoading || projects.isLoading) return <LoadingBlock/>;
   if (sources.isError || projects.isError) return <ErrorBlock onRetry={() => { void sources.refetch(); void projects.refetch(); }}/>;
   const filtered = files.filter(f => `${f.name} ${f.note} ${f.sourceType}`.toLowerCase().includes(query.toLowerCase()));
-  const sourceIcon = (type: string) => type === 'spreadsheet' ? FileSpreadsheet : type === 'folder' ? Folder : BookOpen;
+  const sourceIcon = (type: string) => type === 'spreadsheet' || type.toLowerCase().includes('csv') ? FileSpreadsheet : type === 'folder' ? Folder : BookOpen;
   return <div>
-    <PageHeader eyebrow="WORKSPACE / TRACEABILITY" title="Sources & references" description="Drive links and building-type references behind this project." action={<span className="connected-label"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/> {health.data?.status === 'ok' ? 'App online' : 'App status'}</span>}/>
+    <PageHeader eyebrow="WORKSPACE / TRACEABILITY" title="Sources & references" description="The master quantity map, supplier files from boxes, and separate architecture references." action={<span className="connected-label"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/> {health.data?.status === 'ok' ? 'App online' : 'App status'}</span>}/>
     <section className="source-hero"><div className="source-hero-copy"><div className="eyebrow">LINKED MATERIAL</div><h2>Good decisions<br/>start with <em>good sources.</em></h2><p>Open the original working documents whenever a number or assumption needs context.</p></div><div className="source-hero-graphic"><div className="folder-illustration"><div className="folder-tab"/><div className="folder-sheet sheet-one"/><div className="folder-sheet sheet-two"><span/><span/><span/></div><div className="folder-front"><div className="folder-emblem"><Link2 size={22}/></div></div></div><div className="source-orbit orbit-a"/><div className="source-orbit orbit-b"/><span className="orbit-node node-a"><FileSpreadsheet size={14}/></span><span className="orbit-node node-b"><FileText size={14}/></span></div></section>
     <div className="source-section-head"><div><div className="eyebrow">DRIVE LIBRARY</div><h2>Linked files & folders <span>{files.length.toString().padStart(2,'0')}</span></h2></div><div className="source-search"><Search size={15}/><input placeholder="Find a source…" aria-label="Search sources" value={query} onChange={e => setQuery(e.target.value)}/></div></div>
     <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div></article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>
-    <div className="building-head"><div><div className="eyebrow">REFERENCE INDEX</div><h2>Building types</h2><p>Project references used to group and review related budget lines.</p></div><span className="building-count">{types.length.toString().padStart(2,'0')} REFERENCES</span></div>
+    <div className="building-head"><div><div className="eyebrow">REFERENCE INDEX</div><h2>Building types</h2><p>Architecture references remain separate from the CSV's Eco, Standard, and Premium price tiers.</p></div><span className="building-count">{types.length.toString().padStart(2,'0')} REFERENCES</span></div>
     <div className="building-list">{types.map((project, i) => <article className="building-row" key={project.id} data-testid={`row-building-type-${project.id}`}><span className="building-index">{String(i+1).padStart(2,'0')}</span><div className="building-symbol"><HardHat size={17}/></div><div className="building-name"><strong>{project.name}</strong><span>Building type reference</span></div><a href={project.sourceUrl} target="_blank" rel="noreferrer" className="button button-secondary button-small">Open reference <ExternalLink size={13}/></a></article>)}{!types.length && <EmptyState icon={BookOpen} title="No building types linked" body="The building-type index appears when project references are available."/>}</div>
     <div className="source-note"><ShieldCheck size={16}/><div><strong>Traceability stays intact</strong><span>Source names, URLs, and notes are displayed as provided. References are not modified here.</span></div></div>
   </div>;

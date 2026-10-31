@@ -68,8 +68,26 @@ export const BudgetLineReviewStatus = {
 
 export interface BudgetLine {
   id: string;
+  /** @nullable */
+  code: string | null;
   category: string;
   item: string;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  quantity: number | null;
+  /** @nullable */
+  standardUnitPrice: number | null;
+  /** @nullable */
+  standardTotal: number | null;
+  /** @nullable */
+  ecoUnitPrice: number | null;
+  /** @nullable */
+  ecoTotal: number | null;
+  /** @nullable */
+  premiumUnitPrice: number | null;
+  /** @nullable */
+  premiumTotal: number | null;
   /** @nullable */
   buildingType: string | null;
   /** @nullable */
@@ -114,10 +132,28 @@ export const BudgetLineInputReviewStatus = {
 } as const;
 
 export interface BudgetLineInput {
+  /** @nullable */
+  code?: string | null;
   /** @minLength 1 */
   category: string;
   /** @minLength 1 */
   item: string;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  quantity?: number | null;
+  /** @nullable */
+  standardUnitPrice?: number | null;
+  /** @nullable */
+  standardTotal?: number | null;
+  /** @nullable */
+  ecoUnitPrice?: number | null;
+  /** @nullable */
+  ecoTotal?: number | null;
+  /** @nullable */
+  premiumUnitPrice?: number | null;
+  /** @nullable */
+  premiumTotal?: number | null;
   /** @nullable */
   buildingType?: string | null;
   /** @nullable */
@@ -160,10 +196,28 @@ export const BudgetLineUpdateReviewStatus = {
 } as const;
 
 export interface BudgetLineUpdate {
+  /** @nullable */
+  code?: string | null;
   /** @minLength 1 */
   category?: string;
   /** @minLength 1 */
   item?: string;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  quantity?: number | null;
+  /** @nullable */
+  standardUnitPrice?: number | null;
+  /** @nullable */
+  standardTotal?: number | null;
+  /** @nullable */
+  ecoUnitPrice?: number | null;
+  /** @nullable */
+  ecoTotal?: number | null;
+  /** @nullable */
+  premiumUnitPrice?: number | null;
+  /** @nullable */
+  premiumTotal?: number | null;
   /** @nullable */
   buildingType?: string | null;
   /** @nullable */

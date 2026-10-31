@@ -1,15 +1,13 @@
 import type { BudgetLine, BudgetQuote } from "@workspace/api-zod";
-
-export const pipelineUrl =
-  "https://docs.google.com/spreadsheets/d/1vCrWO4ByjId8OW2N_S_LT7Ws_s7Csm1sur2UaYOFB50/edit";
+import { materialMapRows } from "./material-map-data";
 
 export const sources = [
   {
-    id: "pipeline",
-    name: "pipeline",
+    id: "materials-master",
+    name: "mapa_quantidades.csv",
     sourceType: "spreadsheet",
-    url: pipelineUrl,
-    note: "Original tracking sheet. Summary figures are shown as labeled; their accounting meaning has not been confirmed.",
+    url: "https://drive.google.com/file/d/1dyEaRapoIhxNTUVd7GOKUelob4L-NXhV/view?usp=drivesdk",
+    note: "Master quantity map with Eco, Standard, and Premium pricing; source values are retained as supplied.",
   },
   {
     id: "boxes",
@@ -69,124 +67,35 @@ export const buildingTypes = [
   },
 ] as const;
 
-export const sourceMetrics = [
-  { id: "receitas", label: "Receitas", value: 108000, sourceColumn: "receitas" },
-  { id: "balanco", label: "Balanço", value: 101300, sourceColumn: "balanço" },
-  {
-    id: "investimento",
-    label: "Investimento",
-    value: 122000,
-    sourceColumn: "investimento",
-  },
-  { id: "despesas", label: "Despesas", value: 6700, sourceColumn: "despesas" },
-] as const;
-
-type LineValues = {
-  receitas?: number | null;
-  balanco?: number | null;
-  investimento?: number | null;
-  despesas?: number | null;
-  vendor?: string | null;
-  sourceNote?: string | null;
-};
-
 type BudgetLineSeed = Omit<BudgetLine, "createdAt" | "updatedAt">;
 
-function line(
-  id: string,
-  category: string,
-  item: string,
-  values: LineValues = {},
-): BudgetLineSeed {
-  return {
-    id,
-    category,
-    item,
+export const seedMaterials: BudgetLineSeed[] = materialMapRows.map(
+  (row, index) => ({
+    id: `material-${row.code.replaceAll(".", "-")}`,
+    code: row.code,
+    category: row.category,
+    item: row.item,
+    unit: row.unit,
+    quantity: row.quantity,
+    standardUnitPrice: row.standardUnitPrice,
+    standardTotal: row.standardTotal,
+    ecoUnitPrice: row.ecoUnitPrice,
+    ecoTotal: row.ecoTotal,
+    premiumUnitPrice: row.premiumUnitPrice,
+    premiumTotal: row.premiumTotal,
     buildingType: null,
-    vendor: values.vendor ?? null,
-    receitas: values.receitas ?? null,
-    balanco: values.balanco ?? null,
-    investimento: values.investimento ?? null,
-    despesas: values.despesas ?? null,
+    vendor: null,
+    receitas: null,
+    balanco: null,
+    investimento: null,
+    despesas: null,
     quoteAmount: null,
-    status: "needs_review",
-    reviewStatus: "unreviewed",
-    sourceRow: null,
-    sourceNote:
-      values.sourceNote ??
-      "Imported from pipeline. Original source column is preserved; confirm its meaning before treating it as a budget or actual.",
-  };
-}
-
-export const seedLines: BudgetLineSeed[] = [
-  line("src-land-half-vale", "Terreno", "1/2 Vale da Galega", {
-    balanco: 45000,
-    investimento: 15000,
+    status: "planned",
+    reviewStatus: "confirmed",
+    sourceRow: index + 2,
+    sourceNote: "Imported from boxes/mapa_quantidades.csv; source values preserved.",
   }),
-  line("src-investment-contract", "Terreno", "investment contract", {
-    receitas: 8000,
-    investimento: 500,
-  }),
-  line("src-deed", "Terreno", "deed", { balanco: 108000, investimento: 108000 }),
-  line("src-imt-is", "Terreno", "registo IMT IS", { investimento: 10800 }),
-  line("src-plot-swap", "Terreno", "plot swap", { investimento: 500 }),
-  line("src-deed-plot52", "Terreno", "deed — plot 52", { despesas: 800 }),
-  line("src-reservation-52", "Terreno", "reserva — plot 52", {
-    receitas: 15000,
-    investimento: 500,
-  }),
-  line("src-reservation-53", "Terreno", "reserva — plot 53", { receitas: 15000 }),
-  line("src-topografo", "Serviços", "topografo", { despesas: 450 }),
-  line("src-olga", "Serviços", "Olga", { balanco: 200, despesas: 1200 }),
-  line("src-memo-desc", "Serviços", "memo desc", { despesas: 750 }),
-  line("src-at", "Serviços", "AT", { balanco: 2000 }),
-  line("src-proj-pip", "Arquitetura", "proj pip", { balanco: 2500 }),
-  line("src-cpcv-52", "Terreno", "CPCV 52", { receitas: 35000 }),
-  line("src-first-signal", "Terreno", "1º reforço sinal 52", { receitas: 35000 }),
-  line("src-foundations", "Estrutura", "fundações"),
-  line("src-slab", "Estrutura", "laje — 100m2"),
-  line("src-structure", "Estrutura", "estrutura"),
-  line("src-thermal-blocks", "Blocos térmicos", "blocos térmicos — 185m2", {
-    balanco: 6845,
-    vendor: "Verdasca",
-  }),
-  line("src-water-supply", "Águas", "abastecimento"),
-  line("src-plumbing", "Águas", "canalização"),
-  line("src-electricity", "Eletricidade", "electricidade", {
-    receitas: 5000,
-    investimento: 3500,
-    vendor: "Terra Volt",
-  }),
-  line("src-acoustics", "Acústica", "acustica"),
-  line("src-exterior-finish", "Revestimentos", "revestimento ext"),
-  line("src-plasterboard", "Acabamentos", "pladur"),
-  line("src-painting", "Acabamentos", "pintura"),
-  line("src-lighting", "Iluminação", "iluminação", { vendor: "Bricoware" }),
-  line("src-carpentry", "Carpintaria", "carpintaria", {
-    receitas: 15250,
-    vendor: "Tramadel",
-  }),
-  line("src-kitchen", "Cozinha", "cozinha", { receitas: 4900, vendor: "Tramadel" }),
-  line("src-windows", "Janelas", "janelas", { receitas: 17100, vendor: "Tramadel" }),
-  line("src-security-door", "Portas", "porta alta segurança", {
-    receitas: 1200,
-    vendor: "Dierre",
-  }),
-  line("src-gates", "Portões", "portões automaticos", {
-    receitas: 2700,
-    vendor: "Daportas",
-  }),
-  line("src-interior-finish", "Revestimentos", "revestimento int", {
-    vendor: "Casa Peixoto",
-  }),
-  line("src-bathrooms", "Sanitários", "wcs"),
-  line("src-solar", "Solar", "solar", { receitas: 4900, vendor: "Pelaf" }),
-  line("src-pool", "Piscina", "piscina", { receitas: 20000, vendor: "Blueliving" }),
-  line("src-outdoor-walls", "Exterior", "muros"),
-  line("src-garden", "Exterior", "jardim"),
-  line("src-pergola", "Exterior", "pergola"),
-  line("src-deck", "Exterior", "deck"),
-];
+);
 
 type QuoteSeed = Omit<
   BudgetQuote,

@@ -9,8 +9,17 @@ export const budgetMetaTable = pgTable("budget_meta", {
 
 export const budgetLinesTable = pgTable("budget_lines", {
   id: text("id").primaryKey(),
+  code: text("code"),
   category: text("category").notNull(),
   item: text("item").notNull(),
+  unit: text("unit"),
+  quantity: real("quantity"),
+  standardUnitPrice: real("standard_unit_price"),
+  standardTotal: real("standard_total"),
+  ecoUnitPrice: real("eco_unit_price"),
+  ecoTotal: real("eco_total"),
+  premiumUnitPrice: real("premium_unit_price"),
+  premiumTotal: real("premium_total"),
   buildingType: text("building_type"),
   vendor: text("vendor"),
   receitas: real("receitas"),
