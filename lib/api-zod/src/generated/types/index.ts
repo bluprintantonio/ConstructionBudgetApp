@@ -30,5 +30,7 @@ export * from './budgetQuoteUpdate';
 export * from './budgetQuoteUpdateDocumentType';
 export * from './budgetQuoteUpdateStatus';
 export * from './budgetSource';
+export * from './budgetSourceCheck';
+export * from './budgetSourceChild';
 export * from './budgetSourceSourceType';
 export * from './healthStatus';

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BudgetSourceChild } from './budgetSourceChild';
 import type { BudgetSourceSourceType } from './budgetSourceSourceType';
 
 export interface BudgetSource {
@@ -13,4 +14,13 @@ export interface BudgetSource {
   sourceType: BudgetSourceSourceType;
   url: string;
   note: string;
+  /** @nullable */
+  driveModifiedTime: string | null;
+  /** @nullable */
+  lastCheckedAt: string | null;
+  /** @nullable */
+  status: string | null;
+  /** @nullable */
+  itemCount: number | null;
+  children: BudgetSourceChild[];
 }

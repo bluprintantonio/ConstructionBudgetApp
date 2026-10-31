@@ -35,6 +35,7 @@ import type {
   BudgetQuoteInput,
   BudgetQuoteUpdate,
   BudgetSource,
+  BudgetSourceCheck,
   HealthStatus
 } from './api.schemas';
 
@@ -469,6 +470,80 @@ export function useGetBudgetSources<TData = Awaited<ReturnType<typeof getBudgetS
 
 
 
+
+export const getCheckBudgetSourceConnectionUrl = (sourceId: string,) => {
+
+
+
+
+  return `/api/budget/sources/${sourceId}/check`
+}
+
+/**
+ * @summary Check a linked Google Drive source
+ */
+export const checkBudgetSourceConnection = async (sourceId: string, options?: Parameters<typeof customFetch>[1]): Promise<BudgetSourceCheck> => {
+
+  return customFetch<BudgetSourceCheck>(getCheckBudgetSourceConnectionUrl(sourceId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckBudgetSourceConnectionMutationKey = () => ['checkBudgetSourceConnection'] as const;
+
+export const getCheckBudgetSourceConnectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkBudgetSourceConnection>>, TError,CheckBudgetSourceConnectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkBudgetSourceConnection>>, TError,CheckBudgetSourceConnectionMutationVariables, TContext> => {
+
+const mutationKey = getCheckBudgetSourceConnectionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkBudgetSourceConnection>>, CheckBudgetSourceConnectionMutationVariables> = (props) => {
+          const {sourceId} = props ?? {};
+
+          return  checkBudgetSourceConnection(sourceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckBudgetSourceConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof checkBudgetSourceConnection>>>
+
+    export type CheckBudgetSourceConnectionMutationError = ErrorType<void>
+    export type CheckBudgetSourceConnectionMutationVariables = {sourceId: string}
+
+    /**
+ * @summary Check a linked Google Drive source
+ */
+export const useCheckBudgetSourceConnection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkBudgetSourceConnection>>, TError,CheckBudgetSourceConnectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof checkBudgetSourceConnection>>,
+        TError,
+        CheckBudgetSourceConnectionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCheckBudgetSourceConnectionMutationOptions(options), queryClient);
+    }
 
 export const getGetBudgetLinesUrl = () => {
 

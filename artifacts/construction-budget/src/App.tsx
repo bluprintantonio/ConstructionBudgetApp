@@ -12,6 +12,7 @@ import {
   BudgetLine, BudgetQuote, BudgetLineInput, BudgetQuoteInput,
   BudgetQuoteStatus, BudgetQuoteDocumentType,
   useHealthCheck, useGetBudgetDashboard, useGetBudgetProjects, useGetBudgetSources,
+  useCheckBudgetSourceConnection,
   useGetBudgetLines, useGetBudgetQuotes, useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
   useDeleteBudgetQuote, getGetBudgetDashboardQueryKey, getGetBudgetLinesQueryKey,
@@ -399,17 +400,35 @@ function QuotesPage() {
 
 function SourcesPage() {
   const sources = useGetBudgetSources(); const projects = useGetBudgetProjects(); const health = useHealthCheck();
+  const checkConnection = useCheckBudgetSourceConnection();
   const [query, setQuery] = useState('');
+  const [checkingSourceId, setCheckingSourceId] = useState<string | null>(null);
+  const [checkErrors, setCheckErrors] = useState<Record<string, string>>({});
   const files = sources.data || []; const types = projects.data || [];
   if (sources.isLoading || projects.isLoading) return <LoadingBlock/>;
   if (sources.isError || projects.isError) return <ErrorBlock onRetry={() => { void sources.refetch(); void projects.refetch(); }}/>;
   const filtered = files.filter(f => `${f.name} ${f.note} ${f.sourceType}`.toLowerCase().includes(query.toLowerCase()));
   const sourceIcon = (type: string) => type === 'spreadsheet' || type.toLowerCase().includes('csv') ? FileSpreadsheet : type === 'folder' ? Folder : BookOpen;
+  const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : 'Not checked';
+  const checkSource = async (sourceId: string) => {
+    setCheckingSourceId(sourceId);
+    setCheckErrors(current => ({ ...current, [sourceId]: '' }));
+    try {
+      const result = await checkConnection.mutateAsync({ sourceId });
+      setCheckErrors(current => ({ ...current, [sourceId]: result.error ?? '' }));
+      void sources.refetch();
+    } catch (error) {
+      setCheckErrors(current => ({ ...current, [sourceId]: error instanceof Error ? error.message : 'Drive connection check failed.' }));
+      void sources.refetch();
+    } finally {
+      setCheckingSourceId(null);
+    }
+  };
   return <div>
     <PageHeader eyebrow="WORKSPACE / TRACEABILITY" title="Sources & references" description="The master quantity map, supplier files from boxes, and separate architecture references." action={<span className="connected-label"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/> {health.data?.status === 'ok' ? 'App online' : 'App status'}</span>}/>
     <section className="source-hero"><div className="source-hero-copy"><div className="eyebrow">LINKED MATERIAL</div><h2>Good decisions<br/>start with <em>good sources.</em></h2><p>Open the original working documents whenever a number or assumption needs context.</p></div><div className="source-hero-graphic"><div className="folder-illustration"><div className="folder-tab"/><div className="folder-sheet sheet-one"/><div className="folder-sheet sheet-two"><span/><span/><span/></div><div className="folder-front"><div className="folder-emblem"><Link2 size={22}/></div></div></div><div className="source-orbit orbit-a"/><div className="source-orbit orbit-b"/><span className="orbit-node node-a"><FileSpreadsheet size={14}/></span><span className="orbit-node node-b"><FileText size={14}/></span></div></section>
     <div className="source-section-head"><div><div className="eyebrow">DRIVE LIBRARY</div><h2>Linked files & folders <span>{files.length.toString().padStart(2,'0')}</span></h2></div><div className="source-search"><Search size={15}/><input placeholder="Find a source…" aria-label="Search sources" value={query} onChange={e => setQuery(e.target.value)}/></div></div>
-    <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div></article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>
+    <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div><div className="source-card-foot"><span>Last checked: {formatDate(source.lastCheckedAt)}</span><span>Status: {source.status ? titleCase(source.status) : 'Not checked'}</span></div><button className="button button-secondary button-small" type="button" disabled={checkingSourceId !== null} onClick={() => { void checkSource(source.id); }}>{checkingSourceId === source.id ? 'Checking…' : 'Check connection'}</button>{(checkErrors[source.id] || source.status === 'error') && <p role="alert">{checkErrors[source.id] || 'Drive access failed on the last check.'}</p>}{source.sourceType === 'folder' && source.itemCount !== null && <details open><summary className="source-card-foot">{source.itemCount} direct children</summary><div className="building-list">{source.children.map((child, childIndex) => <div className="building-row" key={`${child.name}-${childIndex}`}><span className="building-index">{String(childIndex + 1).padStart(2, '0')}</span><div className="building-name"><strong>{child.name}</strong><span>{child.type} · {formatDate(child.modifiedTime)}</span></div></div>)}</div></details>}</article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>
     <div className="building-head"><div><div className="eyebrow">REFERENCE INDEX</div><h2>Building types</h2><p>Architecture references remain separate from the CSV's Eco, Standard, and Premium price tiers.</p></div><span className="building-count">{types.length.toString().padStart(2,'0')} REFERENCES</span></div>
     <div className="building-list">{types.map((project, i) => <article className="building-row" key={project.id} data-testid={`row-building-type-${project.id}`}><span className="building-index">{String(i+1).padStart(2,'0')}</span><div className="building-symbol"><HardHat size={17}/></div><div className="building-name"><strong>{project.name}</strong><span>Building type reference</span></div><a href={project.sourceUrl} target="_blank" rel="noreferrer" className="button button-secondary button-small">Open reference <ExternalLink size={13}/></a></article>)}{!types.length && <EmptyState icon={BookOpen} title="No building types linked" body="The building-type index appears when project references are available."/>}</div>
     <div className="source-note"><ShieldCheck size={16}/><div><strong>Traceability stays intact</strong><span>Source names, URLs, and notes are displayed as provided. References are not modified here.</span></div></div>

@@ -66,6 +66,26 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BudgetSource"
+  /budget/sources/{sourceId}/check:
+    post:
+      operationId: checkBudgetSourceConnection
+      tags: [budget]
+      summary: Check a linked Google Drive source
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Drive metadata and direct-child check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetSourceCheck"
+        "404":
+          description: Source not found
   /budget/lines:
     get:
       operationId: getBudgetLines
@@ -254,7 +274,34 @@ components:
         sourceType: { type: string, enum: [spreadsheet, folder, plan] }
         url: { type: string }
         note: { type: string }
-      required: [id, name, sourceType, url, note]
+        driveModifiedTime: { type: ["string", "null"] }
+        lastCheckedAt: { type: ["string", "null"] }
+        status: { type: ["string", "null"] }
+        itemCount: { type: ["integer", "null"] }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/BudgetSourceChild" }
+      required: [id, name, sourceType, url, note, driveModifiedTime, lastCheckedAt, status, itemCount, children]
+    BudgetSourceChild:
+      type: object
+      properties:
+        name: { type: string }
+        type: { type: string }
+        modifiedTime: { type: ["string", "null"] }
+      required: [name, type, modifiedTime]
+    BudgetSourceCheck:
+      type: object
+      properties:
+        id: { type: string }
+        driveModifiedTime: { type: ["string", "null"] }
+        lastCheckedAt: { type: string }
+        status: { type: string }
+        itemCount: { type: ["integer", "null"] }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/BudgetSourceChild" }
+        error: { type: ["string", "null"] }
+      required: [id, driveModifiedTime, lastCheckedAt, status, itemCount, children, error]
     BudgetMetric:
       type: object
       properties:

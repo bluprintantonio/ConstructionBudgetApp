@@ -53,9 +53,40 @@ export const GetBudgetSourcesResponseItem = zod.object({
   "name": zod.string(),
   "sourceType": zod.enum(['spreadsheet', 'folder', 'plan']),
   "url": zod.string(),
-  "note": zod.string()
+  "note": zod.string(),
+  "driveModifiedTime": zod.string().nullable(),
+  "lastCheckedAt": zod.string().nullable(),
+  "status": zod.string().nullable(),
+  "itemCount": zod.number().int().nullable(),
+  "children": zod.array(zod.object({
+  "name": zod.string(),
+  "type": zod.string(),
+  "modifiedTime": zod.string().nullable()
+}))
 })
 export const GetBudgetSourcesResponse = zod.array(GetBudgetSourcesResponseItem)
+
+
+/**
+ * @summary Check a linked Google Drive source
+ */
+export const CheckBudgetSourceConnectionParams = zod.object({
+  "sourceId": zod.coerce.string()
+})
+
+export const CheckBudgetSourceConnectionResponse = zod.object({
+  "id": zod.string(),
+  "driveModifiedTime": zod.string().nullable(),
+  "lastCheckedAt": zod.string(),
+  "status": zod.string(),
+  "itemCount": zod.number().int().nullable(),
+  "children": zod.array(zod.object({
+  "name": zod.string(),
+  "type": zod.string(),
+  "modifiedTime": zod.string().nullable()
+})),
+  "error": zod.string().nullable()
+})
 
 
 /**

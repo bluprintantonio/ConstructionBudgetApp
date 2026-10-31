@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { asc, eq, isNotNull, like } from "drizzle-orm";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import {
   db,
   budgetLinesTable,
@@ -8,6 +9,8 @@ import {
   sourcesTable,
 } from "@workspace/db";
 import {
+  CheckBudgetSourceConnectionParams,
+  CheckBudgetSourceConnectionResponse,
   CreateBudgetLineBody,
   CreateBudgetLineResponse,
   CreateBudgetQuoteBody,
@@ -38,7 +41,104 @@ import {
 } from "../lib/budget-seed";
 
 const router: IRouter = Router();
+const connectors = new ReplitConnectors();
 let seedPromise: Promise<void> | undefined;
+
+type DriveFileMetadata = {
+  name?: string;
+  mimeType?: string;
+  modifiedTime?: string;
+};
+
+type DriveFilesListResponse = {
+  files?: DriveFileMetadata[];
+  nextPageToken?: string;
+  incompleteSearch?: boolean;
+};
+
+function driveTypeLabel(mimeType?: string): string {
+  const labels: Record<string, string> = {
+    "application/vnd.google-apps.folder": "Folder",
+    "application/vnd.google-apps.document": "Google Doc",
+    "application/vnd.google-apps.spreadsheet": "Google Sheet",
+    "application/vnd.google-apps.presentation": "Google Slides",
+    "application/pdf": "PDF",
+    "text/csv": "CSV",
+  };
+  return mimeType ? (labels[mimeType] ?? mimeType) : "Unknown";
+}
+
+async function getDriveJson<T>(path: string): Promise<T> {
+  const response = await connectors.proxy("google-drive", path, {
+    method: "GET",
+  });
+  const payload = (await response.json()) as {
+    error?: { message?: string };
+  } & T;
+  if (!response.ok) {
+    throw new Error(
+      payload.error?.message ??
+        `Google Drive request failed with HTTP ${response.status}.`,
+    );
+  }
+  return payload;
+}
+
+async function readDriveSource(source: typeof sourcesTable.$inferSelect) {
+  const metadataQuery = new URLSearchParams({
+    supportsAllDrives: "true",
+    fields: "id,name,mimeType,modifiedTime",
+  });
+  const metadata = await getDriveJson<DriveFileMetadata>(
+    `/drive/v3/files/${encodeURIComponent(source.driveFileId)}?${metadataQuery}`,
+  );
+
+  const children: {
+    name: string;
+    type: string;
+    modifiedTime: string | null;
+  }[] = [];
+  let incompleteSearch = false;
+
+  if (source.type === "folder") {
+    let pageToken: string | undefined;
+    do {
+      const query = new URLSearchParams({
+        q: `'${source.driveFileId}' in parents and trashed = false`,
+        pageSize: "1000",
+        supportsAllDrives: "true",
+        includeItemsFromAllDrives: "true",
+        fields: "nextPageToken,incompleteSearch,files(name,mimeType,modifiedTime)",
+      });
+      if (pageToken) query.set("pageToken", pageToken);
+
+      const page = await getDriveJson<DriveFilesListResponse>(
+        `/drive/v3/files?${query}`,
+      );
+      children.push(
+        ...(page.files ?? []).map((file) => ({
+          name: file.name ?? "(unnamed)",
+          type: driveTypeLabel(file.mimeType),
+          modifiedTime: file.modifiedTime ?? null,
+        })),
+      );
+      incompleteSearch ||= Boolean(page.incompleteSearch);
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+  }
+
+  return {
+    driveModifiedTime: metadata.modifiedTime
+      ? new Date(metadata.modifiedTime)
+      : null,
+    itemCount: source.type === "folder" ? children.length : null,
+    children,
+    status: incompleteSearch ? "incomplete" : "connected",
+    error: incompleteSearch
+      ? "Google Drive reported an incomplete folder listing."
+      : null,
+  };
+}
 
 async function ensureSeedData(): Promise<void> {
   if (!seedPromise) {
@@ -161,6 +261,36 @@ function serializeQuote(quote: typeof budgetQuotesTable.$inferSelect) {
   };
 }
 
+function serializeSource(source: typeof sourcesTable.$inferSelect) {
+  return {
+    id: source.id,
+    name: source.name,
+    sourceType: source.type === "csv" ? "spreadsheet" : "folder",
+    url: source.driveUrl,
+    note: source.description,
+    driveModifiedTime: source.driveModifiedTime?.toISOString() ?? null,
+    lastCheckedAt: source.lastCheckedAt?.toISOString() ?? null,
+    status: source.status,
+    itemCount: source.itemCount,
+    children: source.children,
+  };
+}
+
+function serializeSourceCheck(
+  source: typeof sourcesTable.$inferSelect,
+  error: string | null,
+) {
+  return {
+    id: source.id,
+    driveModifiedTime: source.driveModifiedTime?.toISOString() ?? null,
+    lastCheckedAt: source.lastCheckedAt?.toISOString() ?? new Date().toISOString(),
+    status: source.status ?? "error",
+    itemCount: source.itemCount,
+    children: source.children,
+    error,
+  };
+}
+
 function newId(): string {
   return crypto.randomUUID();
 }
@@ -258,8 +388,74 @@ router.get("/budget/projects", async (_req, res): Promise<void> => {
 });
 
 router.get("/budget/sources", async (_req, res): Promise<void> => {
-  res.json(GetBudgetSourcesResponse.parse(sources));
+  const sourceRows = await db.select().from(sourcesTable);
+  const sourceOrder = new Map<string, number>(
+    sources.map((source, index) => [source.id, index]),
+  );
+  sourceRows.sort(
+    (first, second) =>
+      (sourceOrder.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+      (sourceOrder.get(second.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  res.json(GetBudgetSourcesResponse.parse(sourceRows.map(serializeSource)));
 });
+
+router.post(
+  "/budget/sources/:sourceId/check",
+  async (req, res): Promise<void> => {
+    const params = CheckBudgetSourceConnectionParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+
+    const [source] = await db
+      .select()
+      .from(sourcesTable)
+      .where(eq(sourcesTable.id, params.data.sourceId))
+      .limit(1);
+    if (!source) {
+      res.status(404).json({ error: "Source not found." });
+      return;
+    }
+
+    const checkedAt = new Date();
+    try {
+      const driveResult = await readDriveSource(source);
+      const [updated] = await db
+        .update(sourcesTable)
+        .set({
+          driveModifiedTime: driveResult.driveModifiedTime,
+          lastCheckedAt: checkedAt,
+          status: driveResult.status,
+          itemCount: driveResult.itemCount,
+          children: driveResult.children,
+        })
+        .where(eq(sourcesTable.id, source.id))
+        .returning();
+      res.json(
+        CheckBudgetSourceConnectionResponse.parse(
+          serializeSourceCheck(updated, driveResult.error),
+        ),
+      );
+    } catch (error) {
+      const [updated] = await db
+        .update(sourcesTable)
+        .set({ lastCheckedAt: checkedAt, status: "error" })
+        .where(eq(sourcesTable.id, source.id))
+        .returning();
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Google Drive access failed.";
+      res.json(
+        CheckBudgetSourceConnectionResponse.parse(
+          serializeSourceCheck(updated, message),
+        ),
+      );
+    }
+  },
+);
 
 router.get("/budget/lines", async (_req, res): Promise<void> => {
   await ensureSeedData();

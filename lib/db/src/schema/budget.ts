@@ -2,10 +2,17 @@ import {
   integer,
   pgEnum,
   pgTable,
+  jsonb,
   real,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
+export type SourceChild = {
+  name: string;
+  type: string;
+  modifiedTime: string | null;
+};
 
 export const sourceTypeEnum = pgEnum("source_type", ["csv", "folder"]);
 export const budgetLineOriginEnum = pgEnum("budget_line_origin", [
@@ -31,6 +38,8 @@ export const sourcesTable = pgTable("sources", {
   driveModifiedTime: timestamp("drive_modified_time", { withTimezone: true }),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   status: text("status"),
+  itemCount: integer("item_count"),
+  children: jsonb("children").$type<SourceChild[]>().notNull().default([]),
 });
 
 export const budgetLinesTable = pgTable("budget_lines", {

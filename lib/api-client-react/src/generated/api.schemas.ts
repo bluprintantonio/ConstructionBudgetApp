@@ -24,12 +24,41 @@ export const BudgetSourceSourceType = {
   plan: 'plan',
 } as const;
 
+export interface BudgetSourceChild {
+  name: string;
+  type: string;
+  /** @nullable */
+  modifiedTime: string | null;
+}
+
 export interface BudgetSource {
   id: string;
   name: string;
   sourceType: BudgetSourceSourceType;
   url: string;
   note: string;
+  /** @nullable */
+  driveModifiedTime: string | null;
+  /** @nullable */
+  lastCheckedAt: string | null;
+  /** @nullable */
+  status: string | null;
+  /** @nullable */
+  itemCount: number | null;
+  children: BudgetSourceChild[];
+}
+
+export interface BudgetSourceCheck {
+  id: string;
+  /** @nullable */
+  driveModifiedTime: string | null;
+  lastCheckedAt: string;
+  status: string;
+  /** @nullable */
+  itemCount: number | null;
+  children: BudgetSourceChild[];
+  /** @nullable */
+  error: string | null;
 }
 
 export interface BudgetMetric {
