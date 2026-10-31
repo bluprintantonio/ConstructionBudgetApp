@@ -43,7 +43,7 @@ function extraCosts(
   return extras.reduce(
     (result, extra) => {
       if (!isIncluded(extra)) return result;
-      if (extra.unitPrice == null || extra.priceStatus === "pending") {
+      if (extra.unitPrice == null) {
         result.pendingExtraCount += 1;
         return result;
       }
