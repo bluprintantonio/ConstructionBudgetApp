@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BudgetLineMarker } from './budgetLineMarker';
 import type { BudgetLineOrigin } from './budgetLineOrigin';
 import type { BudgetLineReviewStatus } from './budgetLineReviewStatus';
 import type { BudgetLineStatus } from './budgetLineStatus';
@@ -56,6 +57,7 @@ export interface BudgetLine {
   origin: BudgetLineOrigin;
   /** @nullable */
   priceBasis: string | null;
+  marker: BudgetLineMarker;
   /** @nullable */
   sourceUrl: string | null;
   createdAt: string;

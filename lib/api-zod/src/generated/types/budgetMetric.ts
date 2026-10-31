@@ -12,6 +12,10 @@ export interface BudgetMetric {
   value: number;
   sourceColumn: string;
   fromCsvLines: number;
+  /** @nullable */
+  fromCommonLines: number | null;
+  /** @nullable */
+  fromPremiumRatedLines: number | null;
   fromExtras: number;
   pendingExtraCount: number;
 }

@@ -39,6 +39,12 @@ export const quoteVatIncludedEnum = pgEnum("quote_vat_included", [
   "no",
   "unknown",
 ]);
+export const lineMarkerEnum = pgEnum("line_marker", [
+  "common",
+  "finishings",
+  "equipment",
+  "systems",
+]);
 
 export const budgetMetaTable = pgTable("budget_meta", {
   id: text("id").primaryKey(),
@@ -95,6 +101,11 @@ export const budgetLinesTable = pgTable("budget_lines", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+});
+
+export const lineMarkersTable = pgTable("line_markers", {
+  budgetLineCode: text("budget_line_code").notNull().unique(),
+  marker: lineMarkerEnum("marker").notNull().default("common"),
 });
 
 export const budgetQuotesTable = pgTable("budget_quotes", {

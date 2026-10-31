@@ -8,6 +8,7 @@ import {
   budgetMetaTable,
   budgetQuotesTable,
   extrasTable,
+  lineMarkersTable,
   plannerInputsTable,
   quoteLinksTable,
   sourcesTable,
@@ -45,6 +46,9 @@ import {
   UpdateBudgetQuoteBody,
   UpdateBudgetQuoteParams,
   UpdateBudgetQuoteResponse,
+  UpdateBudgetLineMarkerParams,
+  UpdateBudgetLineMarkerBody,
+  UpdateBudgetLineMarkerResponse,
 } from "@workspace/api-zod";
 import {
   buildingTypes,
@@ -53,6 +57,7 @@ import {
   sourceSeedRows,
   sources,
   seedExtras,
+  lineMarkerSeedRows,
   toQuoteRow,
 } from "../lib/budget-seed";
 
@@ -60,6 +65,7 @@ const router: IRouter = Router();
 const connectors = new ReplitConnectors();
 let seedPromise: Promise<void> | undefined;
 let extrasSeedPromise: Promise<void> | undefined;
+let lineMarkerSeedPromise: Promise<void> | undefined;
 const PLANNER_INPUTS_ID = "one-house-unit";
 const EMPTY_PLANNER_INPUTS = {
   grossArea: null,
@@ -249,6 +255,19 @@ async function ensureSeedData(): Promise<void> {
     })();
   }
   await seedPromise;
+  await ensureLineMarkerSeedData();
+}
+
+async function ensureLineMarkerSeedData(): Promise<void> {
+  if (!lineMarkerSeedPromise) {
+    lineMarkerSeedPromise = (async () => {
+      await db
+        .insert(lineMarkersTable)
+        .values(lineMarkerSeedRows)
+        .onConflictDoNothing();
+    })();
+  }
+  await lineMarkerSeedPromise;
 }
 
 async function ensureExtrasSeedData(): Promise<void> {
@@ -276,9 +295,11 @@ async function ensureExtrasSeedData(): Promise<void> {
 function serializeLine(
   line: typeof budgetLinesTable.$inferSelect,
   sourceUrl: string | null,
+  marker: typeof lineMarkersTable.$inferSelect.marker,
 ) {
   return {
     ...line,
+    marker,
     sourceUrl,
     createdAt: line.createdAt.toISOString(),
     updatedAt: line.updatedAt.toISOString(),
@@ -288,17 +309,22 @@ function serializeLine(
 async function serializeLines(
   lines: (typeof budgetLinesTable.$inferSelect)[],
 ) {
-  const sourceRows = await db
-    .select({ id: sourcesTable.id, driveUrl: sourcesTable.driveUrl })
-    .from(sourcesTable);
+  const [sourceRows, markerRows] = await Promise.all([
+    db.select({ id: sourcesTable.id, driveUrl: sourcesTable.driveUrl }).from(sourcesTable),
+    db.select().from(lineMarkersTable),
+  ]);
   const sourceUrls = new Map(
     sourceRows.map((source) => [source.id, source.driveUrl]),
+  );
+  const markers = new Map(
+    markerRows.map((marker) => [marker.budgetLineCode, marker.marker]),
   );
 
   return lines.map((line) =>
     serializeLine(
       line,
       line.sourceId ? (sourceUrls.get(line.sourceId) ?? null) : null,
+      line.code ? (markers.get(line.code) ?? "common") : "common",
     ),
   );
 }
@@ -405,12 +431,22 @@ function quoteValues(
 
 router.get("/budget/dashboard", async (_req, res): Promise<void> => {
   await Promise.all([ensureSeedData(), ensureExtrasSeedData()]);
-  const [lines, extras, quotes] = await Promise.all([
+  const [lines, extras, quotes, markerRows] = await Promise.all([
     db.select().from(budgetLinesTable),
     db.select().from(extrasTable),
     db.select().from(budgetQuotesTable),
+    db.select().from(lineMarkersTable),
   ]);
-  const packs = calculatePackTotals(lines, extras);
+  const markers = new Map(
+    markerRows.map((marker) => [marker.budgetLineCode, marker.marker]),
+  );
+  const packs = calculatePackTotals(
+    lines.map((line) => ({
+      ...line,
+      marker: line.code ? (markers.get(line.code) ?? "common") : "common",
+    })),
+    extras,
+  );
   res.json(
     GetBudgetDashboardResponse.parse({
       sourceMetrics: [
@@ -420,6 +456,8 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           value: packs.eco.total,
           sourceColumn: "Standard unit price + extras",
           fromCsvLines: packs.eco.fromCsvLines,
+          fromCommonLines: null,
+          fromPremiumRatedLines: null,
           fromExtras: packs.eco.fromExtras,
           pendingExtraCount: packs.eco.pendingExtraCount,
         },
@@ -429,6 +467,8 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           value: packs.standard.total,
           sourceColumn: "Standard unit price",
           fromCsvLines: packs.standard.fromCsvLines,
+          fromCommonLines: null,
+          fromPremiumRatedLines: null,
           fromExtras: packs.standard.fromExtras,
           pendingExtraCount: packs.standard.pendingExtraCount,
         },
@@ -436,8 +476,10 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           id: "premium",
           label: "Premium",
           value: packs.premium.total,
-          sourceColumn: "Premium unit price + extras",
+          sourceColumn: "Premium price markers + extras",
           fromCsvLines: packs.premium.fromCsvLines,
+          fromCommonLines: packs.premium.fromCommonLines,
+          fromPremiumRatedLines: packs.premium.fromPremiumRatedLines,
           fromExtras: packs.premium.fromExtras,
           pendingExtraCount: packs.premium.pendingExtraCount,
         },
@@ -588,6 +630,44 @@ router.get("/budget/lines", async (_req, res): Promise<void> => {
     .orderBy(asc(budgetLinesTable.category), asc(budgetLinesTable.item));
   res.json(GetBudgetLinesResponse.parse(await serializeLines(lines)));
 });
+
+router.patch(
+  "/budget/line-markers/:budgetLineCode",
+  async (req, res): Promise<void> => {
+    await ensureSeedData();
+    const params = UpdateBudgetLineMarkerParams.safeParse(req.params);
+    const parsed = UpdateBudgetLineMarkerBody.safeParse(req.body);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const [line] = await db
+      .select({ code: budgetLinesTable.code })
+      .from(budgetLinesTable)
+      .where(eq(budgetLinesTable.code, params.data.budgetLineCode))
+      .limit(1);
+    if (!line) {
+      res.status(404).json({ error: "Budget line not found." });
+      return;
+    }
+    const [marker] = await db
+      .insert(lineMarkersTable)
+      .values({
+        budgetLineCode: params.data.budgetLineCode,
+        marker: parsed.data.marker,
+      })
+      .onConflictDoUpdate({
+        target: lineMarkersTable.budgetLineCode,
+        set: { marker: parsed.data.marker },
+      })
+      .returning();
+    res.json(UpdateBudgetLineMarkerResponse.parse(marker));
+  },
+);
 
 router.get("/budget/extras", async (_req, res): Promise<void> => {
   await ensureExtrasSeedData();

@@ -146,6 +146,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BudgetLine"
+  /budget/line-markers/{budgetLineCode}:
+    patch:
+      operationId: updateBudgetLineMarker
+      tags: [budget]
+      summary: Update a budget line marker
+      parameters:
+        - name: budgetLineCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineMarkerUpdate"
+      responses:
+        "200":
+          description: Updated line marker
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineMarker"
+        "404":
+          description: Budget line not found
   /budget/lines/import:
     post:
       operationId: importBudgetLines
@@ -423,9 +449,11 @@ components:
         value: { type: number }
         sourceColumn: { type: string }
         fromCsvLines: { type: number }
+        fromCommonLines: { type: ["number", "null"] }
+        fromPremiumRatedLines: { type: ["number", "null"] }
         fromExtras: { type: number }
         pendingExtraCount: { type: integer }
-      required: [id, label, value, sourceColumn, fromCsvLines, fromExtras, pendingExtraCount]
+      required: [id, label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, fromExtras, pendingExtraCount]
     BudgetDashboard:
       type: object
       properties:
@@ -492,10 +520,11 @@ components:
         sourceId: { type: ["string", "null"] }
         origin: { type: string, enum: [imported, manual, assumption] }
         priceBasis: { type: ["string", "null"] }
+        marker: { type: string, enum: [common, finishings, equipment, systems] }
         sourceUrl: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, code, category, item, unit, quantity, standardUnitPrice, standardTotal, ecoUnitPrice, ecoTotal, premiumUnitPrice, premiumTotal, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, sourceId, origin, priceBasis, sourceUrl, createdAt, updatedAt]
+      required: [id, code, category, item, unit, quantity, standardUnitPrice, standardTotal, ecoUnitPrice, ecoTotal, premiumUnitPrice, premiumTotal, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, sourceId, origin, priceBasis, marker, sourceUrl, createdAt, updatedAt]
     BudgetLineInput:
       type: object
       properties:
@@ -551,6 +580,17 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/BudgetLineInput"
+    LineMarker:
+      type: object
+      properties:
+        budgetLineCode: { type: string }
+        marker: { type: string, enum: [common, finishings, equipment, systems] }
+      required: [budgetLineCode, marker]
+    LineMarkerUpdate:
+      type: object
+      properties:
+        marker: { type: string, enum: [common, finishings, equipment, systems] }
+      required: [marker]
     BudgetExtra:
       type: object
       properties:

@@ -67,6 +67,10 @@ export interface BudgetMetric {
   value: number;
   sourceColumn: string;
   fromCsvLines: number;
+  /** @nullable */
+  fromCommonLines: number | null;
+  /** @nullable */
+  fromPremiumRatedLines: number | null;
   fromExtras: number;
   pendingExtraCount: number;
 }
@@ -149,6 +153,16 @@ export const BudgetLineOrigin = {
   assumption: 'assumption',
 } as const;
 
+export type BudgetLineMarker = typeof BudgetLineMarker[keyof typeof BudgetLineMarker];
+
+
+export const BudgetLineMarker = {
+  common: 'common',
+  finishings: 'finishings',
+  equipment: 'equipment',
+  systems: 'systems',
+} as const;
+
 export interface BudgetLine {
   id: string;
   /** @nullable */
@@ -196,6 +210,7 @@ export interface BudgetLine {
   origin: BudgetLineOrigin;
   /** @nullable */
   priceBasis: string | null;
+  marker: BudgetLineMarker;
   /** @nullable */
   sourceUrl: string | null;
   createdAt: string;
@@ -331,6 +346,35 @@ export interface BudgetLineUpdate {
 }
 
 export type BudgetLineImport = BudgetLineInput[];
+
+export type LineMarkerMarker = typeof LineMarkerMarker[keyof typeof LineMarkerMarker];
+
+
+export const LineMarkerMarker = {
+  common: 'common',
+  finishings: 'finishings',
+  equipment: 'equipment',
+  systems: 'systems',
+} as const;
+
+export interface LineMarker {
+  budgetLineCode: string;
+  marker: LineMarkerMarker;
+}
+
+export type LineMarkerUpdateMarker = typeof LineMarkerUpdateMarker[keyof typeof LineMarkerUpdateMarker];
+
+
+export const LineMarkerUpdateMarker = {
+  common: 'common',
+  finishings: 'finishings',
+  equipment: 'equipment',
+  systems: 'systems',
+} as const;
+
+export interface LineMarkerUpdate {
+  marker: LineMarkerUpdateMarker;
+}
 
 export type BudgetExtraPriceStatus = typeof BudgetExtraPriceStatus[keyof typeof BudgetExtraPriceStatus];
 

@@ -1,6 +1,40 @@
 import type { BudgetExtra, BudgetLine, BudgetQuote } from "@workspace/api-zod";
 import { materialMapRows } from "./material-map-data";
 
+type LineMarkerValue = "common" | "finishings" | "equipment" | "systems";
+
+const approvedLineMarkers: Record<LineMarkerValue, readonly string[]> = {
+  common: [
+    "0.1", "0.2", "0.3",
+    "1.1", "1.2", "1.3", "1.4",
+    "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
+    "3.1", "3.2", "3.3",
+    "10.1", "10.2", "10.3", "10.4", "10.6",
+    "11.1", "11.2", "11.3",
+    "12.1", "12.2", "12.3",
+    "13.1", "13.3",
+    "14.1", "14.2", "14.3", "14.5",
+  ],
+  finishings: [
+    "4.1", "4.2", "4.3",
+    "5.1", "5.2", "5.3", "5.4",
+    "6.1", "6.2", "6.3", "6.4",
+    "7.1", "7.2", "7.3", "7.4", "7.5",
+    "8.1", "8.2", "8.3",
+    "15.1", "15.2", "15.3", "15.6", "15.4", "15.5",
+  ],
+  equipment: ["9.1", "9.2", "9.3", "9.4", "11.4", "14.6"],
+  systems: ["10.5", "13.2", "14.4"],
+};
+
+export const lineMarkerSeedRows = Object.entries(approvedLineMarkers).flatMap(
+  ([marker, codes]) =>
+    codes.map((budgetLineCode) => ({
+      budgetLineCode,
+      marker: marker as LineMarkerValue,
+    })),
+);
+
 export const seedExtras = [
   {
     id: "solar-panels",
@@ -158,7 +192,7 @@ export const buildingTypes = [
 
 type BudgetLineSeed = Omit<
   BudgetLine,
-  "createdAt" | "updatedAt" | "sourceUrl"
+  "createdAt" | "updatedAt" | "sourceUrl" | "marker"
 >;
 
 export const seedMaterials: BudgetLineSeed[] = materialMapRows.map(

@@ -2,6 +2,7 @@ export type PackBudgetLine = {
   quantity: number | null;
   standardUnitPrice: number | null;
   premiumUnitPrice: number | null;
+  marker?: "common" | "finishings" | "equipment" | "systems" | null;
 };
 
 export type PackExtra = {
@@ -14,6 +15,8 @@ export type PackExtra = {
 
 export type PackCost = {
   fromCsvLines: number;
+  fromCommonLines: number | null;
+  fromPremiumRatedLines: number | null;
   fromExtras: number;
   total: number;
   pendingExtraCount: number;
@@ -57,9 +60,13 @@ function extraCosts(
 function packCost(
   fromCsvLines: number,
   extras: Pick<PackCost, "fromExtras" | "pendingExtraCount">,
+  fromCommonLines: number | null = null,
+  fromPremiumRatedLines: number | null = null,
 ): PackCost {
   return {
     fromCsvLines,
+    fromCommonLines,
+    fromPremiumRatedLines,
     fromExtras: extras.fromExtras,
     total: fromCsvLines + extras.fromExtras,
     pendingExtraCount: extras.pendingExtraCount,
@@ -71,7 +78,20 @@ export function calculatePackTotals(
   extras: readonly PackExtra[],
 ): PackTotals {
   const standardFromCsv = csvLinesTotal(lines, "standardUnitPrice");
-  const premiumFromCsv = csvLinesTotal(lines, "premiumUnitPrice");
+  const premiumLines = lines.reduce(
+    (totals, line) => {
+      const quantity = line.quantity ?? 0;
+      if (!line.marker || line.marker === "common") {
+        totals.fromCommonLines += quantity * (line.standardUnitPrice ?? 0);
+      } else {
+        totals.fromPremiumRatedLines += quantity * (line.premiumUnitPrice ?? 0);
+      }
+      return totals;
+    },
+    { fromCommonLines: 0, fromPremiumRatedLines: 0 },
+  );
+  const premiumFromCsv =
+    premiumLines.fromCommonLines + premiumLines.fromPremiumRatedLines;
   const ecoExtras = extraCosts(extras, (extra) => extra.inEco);
   const premiumExtras = extraCosts(extras, (extra) => extra.inPremium);
 
@@ -81,6 +101,11 @@ export function calculatePackTotals(
       pendingExtraCount: 0,
     }),
     eco: packCost(standardFromCsv, ecoExtras),
-    premium: packCost(premiumFromCsv, premiumExtras),
+    premium: packCost(
+      premiumFromCsv,
+      premiumExtras,
+      premiumLines.fromCommonLines,
+      premiumLines.fromPremiumRatedLines,
+    ),
   };
 }

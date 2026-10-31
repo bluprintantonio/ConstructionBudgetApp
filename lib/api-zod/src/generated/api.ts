@@ -27,6 +27,8 @@ export const GetBudgetDashboardResponse = zod.object({
   "value": zod.number(),
   "sourceColumn": zod.string(),
   "fromCsvLines": zod.number(),
+  "fromCommonLines": zod.number().nullable(),
+  "fromPremiumRatedLines": zod.number().nullable(),
   "fromExtras": zod.number(),
   "pendingExtraCount": zod.number().int()
 })),
@@ -166,6 +168,7 @@ export const GetBudgetLinesResponseItem = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -232,9 +235,27 @@ export const CreateBudgetLineResponse = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update a budget line marker
+ */
+export const UpdateBudgetLineMarkerParams = zod.object({
+  "budgetLineCode": zod.coerce.string()
+})
+
+export const UpdateBudgetLineMarkerBody = zod.object({
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems'])
+})
+
+export const UpdateBudgetLineMarkerResponse = zod.object({
+  "budgetLineCode": zod.string(),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems'])
 })
 
 
@@ -298,6 +319,7 @@ export const ImportBudgetLinesResponseItem = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -368,6 +390,7 @@ export const UpdateBudgetLineResponse = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()

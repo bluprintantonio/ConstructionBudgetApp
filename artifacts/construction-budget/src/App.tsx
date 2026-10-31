@@ -17,6 +17,7 @@ import {
   useGetBudgetLines, useGetBudgetQuotes, useGetBudgetQuoteLinks, useUpdateBudgetQuoteLinks,
   useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
+  useUpdateBudgetLineMarker,
   useDeleteBudgetQuote, getGetBudgetDashboardQueryKey, getGetBudgetLinesQueryKey,
   getGetBudgetExtrasQueryKey,
   getGetBudgetQuotesQueryKey, getGetBudgetQuoteLinksQueryKey
@@ -262,12 +263,14 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <div className="page-heading fade-up"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action}</div>;
 }
 
-function MetricTile({ label, value, sourceColumn, fromCsvLines, fromExtras, pendingExtraCount, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; fromCsvLines: number; fromExtras: number; pendingExtraCount: number; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
+function MetricTile({ label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, fromExtras, pendingExtraCount, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; fromCsvLines: number; fromCommonLines: number | null; fromPremiumRatedLines: number | null; fromExtras: number; pendingExtraCount: number; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
   return <article className="metric-tile fade-up" style={{ animationDelay: `${index * 60}ms` }}>
     <div className="metric-top"><span className="metric-icon"><Icon size={17}/></span><span className="source-col">{sourceColumn}</span></div>
     <div className="metric-value">{currency(value, currencyCode)}</div><div className="metric-label">{label}</div>
-    <div className="metric-foot"><span>CSV lines + extras</span><ArrowUpRight size={14}/></div>
-    <div className="metric-label">From CSV lines: {currency(fromCsvLines, currencyCode)} · from extras: {currency(fromExtras, currencyCode)}</div>
+    <div className="metric-foot"><span>CSV lines + extras · markers affect Premium</span><ArrowUpRight size={14}/></div>
+    {fromCommonLines !== null && fromPremiumRatedLines !== null
+      ? <div className="metric-label">Common lines: {currency(fromCommonLines, currencyCode)} · Premium-rated lines: {currency(fromPremiumRatedLines, currencyCode)} · Extras: {currency(fromExtras, currencyCode)}</div>
+      : <div className="metric-label">From CSV lines: {currency(fromCsvLines, currencyCode)} · from extras: {currency(fromExtras, currencyCode)}</div>}
     {pendingExtraCount > 0 && <div className="metric-label">{pendingExtraCount} {pendingExtraCount === 1 ? 'extra' : 'extras'} pending a price</div>}
   </article>;
 }
@@ -357,6 +360,7 @@ function BudgetPage() {
   const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
   const { currencyCode } = useCurrency();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
+  const updateMarker = useUpdateBudgetLineMarker();
   const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
   const [extraDrafts, setExtraDrafts] = useState<Record<string, ExtraDraft>>({});
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
@@ -398,6 +402,20 @@ function BudgetPage() {
       onError: () => setMessage(`Could not save ${extra.name}.`),
     });
   };
+  const saveMarker = (line: BudgetLine, marker: BudgetLine['marker']) => {
+    if (!line.code) return;
+    updateMarker.mutate(
+      { budgetLineCode: line.code, data: { marker } },
+      {
+        onSuccess: () => {
+          setMessage(`${line.code} marker saved. The Premium total is updated.`);
+          void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() });
+          void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() });
+        },
+        onError: () => setMessage(`Could not save the marker for ${line.code}.`),
+      },
+    );
+  };
   const useQuotePrice = (extra: BudgetExtra, quote: BudgetQuote) => {
     if (quote.amount == null) return;
     updateExtra.mutate({
@@ -434,17 +452,19 @@ function BudgetPage() {
   if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
      <PageHeader eyebrow="WORKSPACE / MASTER MAP" title="Materials & quantities" description="Coded items from the master CSV, with Eco, Standard, and Premium price tiers." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines, extrasQuery.data || [])} disabled={!lines.length || extrasQuery.isLoading || extrasQuery.isError}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div>}/>
-    <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
+     <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
+     <div className="data-footnote"><SlidersHorizontal size={14}/> Changing a marker changes the Premium total. Lines without a saved marker count as Common.</div>
      {packMetrics.length > 0 && <><div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2>Pack totals</h2></div></div><div className="metrics-grid">{packMetrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div></>}
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
      {(quotesQuery.isError || quoteLinksQuery.isError) && <div className="inline-message"><AlertCircle size={15}/>Quote comparisons could not be loaded. Refresh to try again.</div>}
     <section className="panel register-panel">
       <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
-      <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div><div className="table-scroll scrollbar-thin"><table className="data-table budget-table materials-table"><thead><tr><th>CODE</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th>ECO</th><th>STANDARD</th><th>PREMIUM</th><th/></tr></thead><tbody>
+      <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div><div className="table-scroll scrollbar-thin"><table className="data-table budget-table materials-table"><thead><tr><th>CODE</th><th>MARKER</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th>ECO</th><th>STANDARD</th><th>PREMIUM</th><th/></tr></thead><tbody>
        {filtered.map(line => {
          const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
          return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
            <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
+           <td><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={line.marker || 'common'} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems'] as BudgetLine['marker'][]).map(marker => <option key={marker} value={marker}>{titleCase(marker)}</option>)}</select></label></td>
            <td className="material-chapter">{line.category}</td>
            <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
              const quote = quotesById.get(comparison.quoteId);
@@ -466,7 +486,7 @@ function BudgetPage() {
            <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
          </tr>;
        })}
-      {!filtered.length && <tr><td colSpan={9}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
+      {!filtered.length && <tr><td colSpan={10}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
       </tbody></table></div>
       <div className="table-footer"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
     </section>
