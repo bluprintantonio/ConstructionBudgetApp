@@ -5,6 +5,7 @@ import {
   getGetPlannerInputsQueryKey,
   useGetBudgetExtras,
   useGetBudgetLines,
+  useGetPlannerHouseTypes,
   useGetPlannerInputs,
   useUpdatePlannerInputs,
 } from "@workspace/api-client-react";
@@ -14,14 +15,18 @@ import type {
 } from "@workspace/api-client-react";
 import { calculatePackTotals } from "@workspace/engine/packs";
 import {
-  calculatePlanner,
+  calculateHouseTypeComparisonRows,
+  calculatePlannerPackResults,
   calculatePlannerPresentation,
+  inputsForPack,
+  type HouseTypePlannerInputs,
   type PlannerConstructionBreakdown,
+  type PlannerPackTotals,
   type PlannerPresentation,
 } from "@workspace/engine/planner";
 
 type CurrencyCode = "EUR" | "GBP" | "USD";
-type PlannerField = keyof PlannerInputsUpdate;
+type PlannerField = Exclude<keyof PlannerInputsUpdate, "landNote">;
 type PlannerDraft = Record<PlannerField, string>;
 
 const fieldDefinitions: {
@@ -37,7 +42,21 @@ const fieldDefinitions: {
   { key: "targetNetMarginPercent", label: "Target NET margin (%)", step: "0.01" },
   { key: "salesCommissionPercent", label: "Sales commission (%)", step: "0.01" },
   { key: "taxesPercent", label: "Taxes (%)", step: "0.01" },
-  { key: "referenceSellingPrice", label: "Reference selling price", step: "0.01" },
+  {
+    key: "standardReferenceSellingPrice",
+    label: "Standard reference selling price",
+    step: "0.01",
+  },
+  {
+    key: "ecoReferenceSellingPrice",
+    label: "Eco reference selling price",
+    step: "0.01",
+  },
+  {
+    key: "premiumReferenceSellingPrice",
+    label: "Premium reference selling price",
+    step: "0.01",
+  },
 ];
 
 const emptyDraft: PlannerDraft = {
@@ -49,7 +68,9 @@ const emptyDraft: PlannerDraft = {
   targetNetMarginPercent: "",
   salesCommissionPercent: "",
   taxesPercent: "",
-  referenceSellingPrice: "",
+  standardReferenceSellingPrice: "",
+  ecoReferenceSellingPrice: "",
+  premiumReferenceSellingPrice: "",
 };
 
 const packDefinitions = [
@@ -74,36 +95,49 @@ function constructionBreakdown(pack: {
   };
 }
 
-function draftFromInputs(inputs: PlannerInputs): PlannerDraft {
+function draftFromInputs(inputs?: PlannerInputs): PlannerDraft {
   return {
-    grossArea: inputs.grossArea == null ? "" : String(inputs.grossArea),
-    land: inputs.land == null ? "" : String(inputs.land),
+    grossArea: inputs?.grossArea == null ? "" : String(inputs.grossArea),
+    land: inputs?.land == null ? "" : String(inputs.land),
     designLicensing:
-      inputs.designLicensing == null ? "" : String(inputs.designLicensing),
+      inputs?.designLicensing == null ? "" : String(inputs.designLicensing),
     managementPercent:
-      inputs.managementPercent == null ? "" : String(inputs.managementPercent),
+      inputs?.managementPercent == null ? "" : String(inputs.managementPercent),
     contingencyPercent:
-      inputs.contingencyPercent == null ? "" : String(inputs.contingencyPercent),
+      inputs?.contingencyPercent == null ? "" : String(inputs.contingencyPercent),
     targetNetMarginPercent:
-      inputs.targetNetMarginPercent == null
+      inputs?.targetNetMarginPercent == null
         ? ""
         : String(inputs.targetNetMarginPercent),
     salesCommissionPercent:
-      inputs.salesCommissionPercent == null
+      inputs?.salesCommissionPercent == null
         ? ""
         : String(inputs.salesCommissionPercent),
-    taxesPercent: inputs.taxesPercent == null ? "" : String(inputs.taxesPercent),
-    referenceSellingPrice:
-      inputs.referenceSellingPrice == null
+    taxesPercent:
+      inputs?.taxesPercent == null ? "" : String(inputs.taxesPercent),
+    standardReferenceSellingPrice:
+      inputs?.standardReferenceSellingPrice == null
         ? ""
-        : String(inputs.referenceSellingPrice),
+        : String(inputs.standardReferenceSellingPrice),
+    ecoReferenceSellingPrice:
+      inputs?.ecoReferenceSellingPrice == null
+        ? ""
+        : String(inputs.ecoReferenceSellingPrice),
+    premiumReferenceSellingPrice:
+      inputs?.premiumReferenceSellingPrice == null
+        ? ""
+        : String(inputs.premiumReferenceSellingPrice),
   };
 }
 
-function inputsFromDraft(draft: PlannerDraft): PlannerInputsUpdate {
+function inputsFromDraft(
+  draft: PlannerDraft,
+  landNote: string,
+): PlannerInputsUpdate {
   const parseValue = (value: string) =>
     value.trim() === "" ? null : Number(value);
   return {
+    landNote: landNote.trim() === "" ? null : landNote,
     grossArea: parseValue(draft.grossArea),
     land: parseValue(draft.land),
     designLicensing: parseValue(draft.designLicensing),
@@ -112,7 +146,39 @@ function inputsFromDraft(draft: PlannerDraft): PlannerInputsUpdate {
     targetNetMarginPercent: parseValue(draft.targetNetMarginPercent),
     salesCommissionPercent: parseValue(draft.salesCommissionPercent),
     taxesPercent: parseValue(draft.taxesPercent),
-    referenceSellingPrice: parseValue(draft.referenceSellingPrice),
+    standardReferenceSellingPrice: parseValue(
+      draft.standardReferenceSellingPrice,
+    ),
+    ecoReferenceSellingPrice: parseValue(draft.ecoReferenceSellingPrice),
+    premiumReferenceSellingPrice: parseValue(
+      draft.premiumReferenceSellingPrice,
+    ),
+  };
+}
+
+function engineInputsFromUpdate(
+  inputs: PlannerInputsUpdate,
+): HouseTypePlannerInputs {
+  const { landNote: _landNote, ...engineInputs } = inputs;
+  return engineInputs;
+}
+
+function engineInputsFromSaved(
+  inputs: PlannerInputs | undefined,
+): HouseTypePlannerInputs | null {
+  if (!inputs) return null;
+  return {
+    grossArea: inputs.grossArea,
+    land: inputs.land,
+    designLicensing: inputs.designLicensing,
+    managementPercent: inputs.managementPercent,
+    contingencyPercent: inputs.contingencyPercent,
+    targetNetMarginPercent: inputs.targetNetMarginPercent,
+    salesCommissionPercent: inputs.salesCommissionPercent,
+    taxesPercent: inputs.taxesPercent,
+    standardReferenceSellingPrice: inputs.standardReferenceSellingPrice,
+    ecoReferenceSellingPrice: inputs.ecoReferenceSellingPrice,
+    premiumReferenceSellingPrice: inputs.premiumReferenceSellingPrice,
   };
 }
 
@@ -138,53 +204,108 @@ export default function PlannerPage({
 }: {
   currencyCode: CurrencyCode;
 }) {
+  const houseTypesQuery = useGetPlannerHouseTypes();
   const inputsQuery = useGetPlannerInputs();
   const linesQuery = useGetBudgetLines();
   const extrasQuery = useGetBudgetExtras();
   const updateInputs = useUpdatePlannerInputs();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<PlannerDraft>(emptyDraft);
+  const [landNote, setLandNote] = useState("");
   const [notice, setNotice] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [selectedHouseTypeId, setSelectedHouseTypeId] = useState("");
   const [selectedPack, setSelectedPack] = useState<PackId>("standard");
 
   useEffect(() => {
-    if (inputsQuery.data) setDraft(draftFromInputs(inputsQuery.data));
-  }, [inputsQuery.data]);
+    const houseTypes = houseTypesQuery.data;
+    if (!houseTypes?.length) return;
+    setSelectedHouseTypeId((current) =>
+      houseTypes.some((houseType) => houseType.id === current)
+        ? current
+        : houseTypes[0].id,
+    );
+  }, [houseTypesQuery.data]);
 
-  const inputs = useMemo(() => inputsFromDraft(draft), [draft]);
+  const selectedHouseType = houseTypesQuery.data?.find(
+    (houseType) => houseType.id === selectedHouseTypeId,
+  );
+  const savedInputs = inputsQuery.data?.find(
+    (inputs) => inputs.houseTypeId === selectedHouseTypeId,
+  );
+
+  useEffect(() => {
+    setDraft(draftFromInputs(savedInputs));
+    setLandNote(savedInputs?.landNote ?? "");
+    setNotice("");
+    setSaveError("");
+  }, [selectedHouseTypeId, savedInputs]);
+
+  const inputs = useMemo(
+    () => inputsFromDraft(draft, landNote),
+    [draft, landNote],
+  );
+  const engineInputs = useMemo(
+    () => engineInputsFromUpdate(inputs),
+    [inputs],
+  );
   const packTotals = useMemo(() => {
     if (!linesQuery.data || !extrasQuery.data) return null;
     return calculatePackTotals(linesQuery.data, extrasQuery.data);
   }, [linesQuery.data, extrasQuery.data]);
   const results = useMemo(() => {
     if (!packTotals) return null;
-    return {
-      standard: calculatePlanner(packTotals.standard.total, inputs),
-      eco: calculatePlanner(packTotals.eco.total, inputs),
-      premium: calculatePlanner(packTotals.premium.total, inputs),
-    };
-  }, [inputs, packTotals]);
+    return calculatePlannerPackResults(
+      {
+        standard: packTotals.standard.total,
+        eco: packTotals.eco.total,
+        premium: packTotals.premium.total,
+      },
+      engineInputs,
+    );
+  }, [engineInputs, packTotals]);
   const presentations = useMemo<Record<PackId, PlannerPresentation> | null>(() => {
     if (!packTotals || !results) return null;
     return {
       standard: calculatePlannerPresentation(
         results.standard,
-        inputs,
+        inputsForPack(engineInputs, "standard"),
         constructionBreakdown(packTotals.standard),
       ),
       eco: calculatePlannerPresentation(
         results.eco,
-        inputs,
+        inputsForPack(engineInputs, "eco"),
         constructionBreakdown(packTotals.eco),
       ),
       premium: calculatePlannerPresentation(
         results.premium,
-        inputs,
+        inputsForPack(engineInputs, "premium"),
         constructionBreakdown(packTotals.premium),
       ),
     };
-  }, [inputs, packTotals, results]);
+  }, [engineInputs, packTotals, results]);
+
+  const comparisonRows = useMemo(() => {
+    if (!packTotals || !houseTypesQuery.data) return [];
+    const totals: PlannerPackTotals = {
+      standard: packTotals.standard.total,
+      eco: packTotals.eco.total,
+      premium: packTotals.premium.total,
+    };
+    return calculateHouseTypeComparisonRows(
+      totals,
+      houseTypesQuery.data.map((houseType) => ({
+        id: houseType.id,
+        name: houseType.name,
+        costBasis: houseType.costBasis,
+        inputs: engineInputsFromSaved(
+          inputsQuery.data?.find(
+            (saved) => saved.houseTypeId === houseType.id,
+          ),
+        ),
+      })),
+    );
+  }, [houseTypesQuery.data, inputsQuery.data, packTotals]);
 
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -197,13 +318,19 @@ export default function PlannerPage({
       setNotice("");
       return;
     }
+    if (!selectedHouseTypeId) {
+      setSaveError("Choose a house type before saving assumptions.");
+      setNotice("");
+      return;
+    }
     setSaveError("");
     setNotice("");
     updateInputs.mutate(
-      { data: inputs },
+      { houseTypeId: selectedHouseTypeId, data: inputs },
       {
         onSuccess: (saved) => {
           setDraft(draftFromInputs(saved));
+          setLandNote(saved.landNote ?? "");
           setNotice("Assumptions saved to the database.");
           void queryClient.invalidateQueries({
             queryKey: getGetPlannerInputsQueryKey(),
@@ -217,14 +344,23 @@ export default function PlannerPage({
   const pageHeader = (
     <div className="page-heading fade-up">
       <div>
-        <div className="eyebrow">WORKSPACE / ONE HOUSE UNIT</div>
+        <div className="eyebrow">
+          WORKSPACE / {selectedHouseType?.name.toUpperCase() ?? "HOUSE TYPE"} · ONE HOUSE UNIT
+        </div>
         <h1>Planner</h1>
-        <p>Compare the three pack outcomes using saved assumptions.</p>
+        <p>
+          Compare the three pack outcomes for {selectedHouseType?.name ?? "this type"} using its saved assumptions.
+        </p>
       </div>
     </div>
   );
 
-  if (inputsQuery.isLoading || linesQuery.isLoading || extrasQuery.isLoading) {
+  if (
+    houseTypesQuery.isLoading ||
+    inputsQuery.isLoading ||
+    linesQuery.isLoading ||
+    extrasQuery.isLoading
+  ) {
     return (
       <div>
         {pageHeader}
@@ -233,7 +369,12 @@ export default function PlannerPage({
     );
   }
 
-  if (inputsQuery.isError || linesQuery.isError || extrasQuery.isError) {
+  if (
+    houseTypesQuery.isError ||
+    inputsQuery.isError ||
+    linesQuery.isError ||
+    extrasQuery.isError
+  ) {
     return (
       <div>
         {pageHeader}
@@ -265,6 +406,52 @@ export default function PlannerPage({
   return (
     <div className="planner-page">
       {pageHeader}
+
+      <div
+        className="planner-house-type-tabs"
+        role="tablist"
+        aria-label="Choose a house type"
+      >
+        {houseTypesQuery.data?.map((houseType, index) => (
+          <button
+            aria-controls="planner-house-type-panel"
+            aria-selected={selectedHouseTypeId === houseType.id}
+            className="planner-house-type-tab"
+            id={`planner-house-type-tab-${houseType.id}`}
+            key={houseType.id}
+            onClick={() => setSelectedHouseTypeId(houseType.id)}
+            onKeyDown={(event) => {
+              const nextIndex =
+                event.key === "ArrowRight"
+                  ? (index + 1) % houseTypesQuery.data!.length
+                  : event.key === "ArrowLeft"
+                    ? (index - 1 + houseTypesQuery.data!.length) %
+                      houseTypesQuery.data!.length
+                    : null;
+              if (nextIndex !== null) {
+                event.preventDefault();
+                const nextHouseType = houseTypesQuery.data![nextIndex];
+                setSelectedHouseTypeId(nextHouseType.id);
+                document
+                  .getElementById(`planner-house-type-tab-${nextHouseType.id}`)
+                  ?.focus();
+              }
+            }}
+            role="tab"
+            tabIndex={selectedHouseTypeId === houseType.id ? 0 : -1}
+            type="button"
+          >
+            {houseType.name}
+          </button>
+        ))}
+      </div>
+
+      {selectedHouseType?.costBasis === "Twin CSV (provisional)" && (
+        <div className="planner-provisional-banner" role="note">
+          Costs for this type use the Twin CSV (provisional). Import a
+          type-specific CSV to change this.
+        </div>
+      )}
 
       <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
         {packDefinitions.map(({ id, label }) => (
@@ -306,35 +493,70 @@ export default function PlannerPage({
         ))}
       </div>
 
-      <section className="panel register-panel">
+      <section
+        className="panel register-panel"
+        id="planner-house-type-panel"
+        aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}
+      >
         <div className="register-toolbar">
           <div>
             <div className="eyebrow">ASSUMPTIONS</div>
-            <strong>One house unit</strong>
+            <strong>{selectedHouseType?.name ?? "House type"} · one house unit</strong>
           </div>
           <span className="pill attention"><i />ASSUMPTION</span>
         </div>
         <form className="form-grid recent-panel" onSubmit={save}>
-          {fieldDefinitions.map(({ key, label, step }) => (
-            <label className="form-field" key={key}>
-              <span>
-                {label} · ASSUMPTION
-              </span>
-              <input
-                type="number"
-                step={step}
-                value={draft[key]}
-                onChange={(event) => {
-                  setDraft((current) => ({
-                    ...current,
-                    [key]: event.target.value,
-                  }));
-                  setNotice("");
-                  setSaveError("");
-                }}
-              />
-            </label>
-          ))}
+          {fieldDefinitions.map(({ key, label, step }) =>
+            key === "land" ? (
+              <div className="planner-land-inputs" key={key}>
+                <label className="form-field">
+                  <span>Land · ASSUMPTION</span>
+                  <input
+                    type="number"
+                    step={step}
+                    value={draft.land}
+                    onChange={(event) => {
+                      setDraft((current) => ({
+                        ...current,
+                        land: event.target.value,
+                      }));
+                      setNotice("");
+                      setSaveError("");
+                    }}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Land note</span>
+                  <input
+                    type="text"
+                    value={landNote}
+                    onChange={(event) => {
+                      setLandNote(event.target.value);
+                      setNotice("");
+                      setSaveError("");
+                    }}
+                  />
+                </label>
+              </div>
+            ) : (
+              <label className="form-field" key={key}>
+                <span>{label} · ASSUMPTION</span>
+                <input
+                  type="number"
+                  step={step}
+                  value={draft[key]}
+                  onChange={(event) => {
+                    setDraft((current) => ({
+                      ...current,
+                      [key]: event.target.value,
+                    }));
+                    setNotice("");
+                    setSaveError("");
+                  }}
+                />
+              </label>
+            ),
+          )}
           <div className="form-actions">
             <button
               className="button button-primary"
@@ -622,6 +844,75 @@ export default function PlannerPage({
                   </div>
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section
+            className="panel planner-house-type-comparison"
+            aria-labelledby="planner-house-type-comparison-heading"
+          >
+            <div className="section-heading">
+              <div>
+                <div className="eyebrow">HOUSE TYPE COMPARISON</div>
+                <h2 id="planner-house-type-comparison-heading">Compare house types</h2>
+              </div>
+            </div>
+            <div className="planner-house-type-table-wrap">
+              <table className="planner-house-type-table">
+                <thead>
+                  <tr>
+                    <th scope="col">House type</th>
+                    <th scope="col">Land</th>
+                    <th scope="col">Standard</th>
+                    <th scope="col">Eco</th>
+                    <th scope="col">Premium</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row) => (
+                    <tr
+                      className={
+                        row.id === selectedHouseTypeId ? "is-selected" : ""
+                      }
+                      key={row.id}
+                    >
+                      <th scope="row">
+                        <div className="planner-house-type-name">
+                          <span>{row.name}</span>
+                          {row.costBasis === "Twin CSV (provisional)" && (
+                            <span className="pill attention">
+                              <i />
+                              PROVISIONAL
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                      <td>{formatCurrency(row.land, currencyCode)}</td>
+                      {packDefinitions.map(({ id }) => {
+                        const metrics = row[id];
+                        return (
+                          <td key={id}>
+                            <div className="planner-house-type-pack-metrics">
+                              <span>
+                                <em>Net profit</em>
+                                <strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong>
+                              </span>
+                              <span>
+                                <em>Net margin</em>
+                                <strong>{formatPercent(metrics.netMargin)}</strong>
+                              </span>
+                              <span>
+                                <em>ROI</em>
+                                <strong>{formatPercent(metrics.roi)}</strong>
+                              </span>
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         </div>

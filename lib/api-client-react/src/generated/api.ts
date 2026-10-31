@@ -41,6 +41,7 @@ import type {
   BudgetSource,
   BudgetSourceCheck,
   HealthStatus,
+  HouseType,
   LineMarker,
   LineMarkerUpdate,
   PlannerInputs,
@@ -286,11 +287,11 @@ export const getGetPlannerInputsUrl = () => {
 }
 
 /**
- * @summary Read one-house-unit planner assumptions
+ * @summary List saved planner assumptions by house type
  */
-export const getPlannerInputs = async ( options?: Parameters<typeof customFetch>[1]): Promise<PlannerInputs> => {
+export const getPlannerInputs = async ( options?: Parameters<typeof customFetch>[1]): Promise<PlannerInputs[]> => {
 
-  return customFetch<PlannerInputs>(getGetPlannerInputsUrl(),
+  return customFetch<PlannerInputs[]>(getGetPlannerInputsUrl(),
   {
     ...options,
     method: 'GET'
@@ -357,7 +358,7 @@ export function useGetPlannerInputs<TData = Awaited<ReturnType<typeof getPlanner
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Read one-house-unit planner assumptions
+ * @summary List saved planner assumptions by house type
  */
 
 export function useGetPlannerInputs<TData = Awaited<ReturnType<typeof getPlannerInputs>>, TError = ErrorType<unknown>>(
@@ -378,18 +379,120 @@ export function useGetPlannerInputs<TData = Awaited<ReturnType<typeof getPlanner
 
 
 
-export const getUpdatePlannerInputsUrl = () => {
+export const getGetPlannerHouseTypesUrl = () => {
 
 
 
 
-  return `/api/budget/planner-inputs`
+  return `/api/budget/house-types`
 }
 
 /**
- * @summary Save one-house-unit planner assumptions
+ * @summary List house types available in Planner
  */
-export const updatePlannerInputs = async (plannerInputsUpdate: PlannerInputsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<PlannerInputs> => {
+export const getPlannerHouseTypes = async ( options?: Parameters<typeof customFetch>[1]): Promise<HouseType[]> => {
+
+  return customFetch<HouseType[]>(getGetPlannerHouseTypesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlannerHouseTypesQueryKey = () => {
+    return [
+    `/api/budget/house-types`
+    ] as const;
+    }
+
+
+export const getGetPlannerHouseTypesQueryOptions = <TData = Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlannerHouseTypesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlannerHouseTypes>>> = ({ signal }) => getPlannerHouseTypes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPlannerHouseTypesQueryResult = NonNullable<Awaited<ReturnType<typeof getPlannerHouseTypes>>>
+export type GetPlannerHouseTypesQueryError = ErrorType<unknown>
+
+
+export function useGetPlannerHouseTypes<TData = Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlannerHouseTypes>>,
+          TError,
+          Awaited<ReturnType<typeof getPlannerHouseTypes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlannerHouseTypes<TData = Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlannerHouseTypes>>,
+          TError,
+          Awaited<ReturnType<typeof getPlannerHouseTypes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlannerHouseTypes<TData = Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List house types available in Planner
+ */
+
+export function useGetPlannerHouseTypes<TData = Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlannerHouseTypes>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPlannerHouseTypesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdatePlannerInputsUrl = (houseTypeId: string,) => {
+
+
+
+
+  return `/api/budget/planner-inputs/${houseTypeId}`
+}
+
+/**
+ * @summary Save planner assumptions for a house type
+ */
+export const updatePlannerInputs = async (houseTypeId: string,
+    plannerInputsUpdate: PlannerInputsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<PlannerInputs> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -405,7 +508,7 @@ export const updatePlannerInputs = async (plannerInputsUpdate: PlannerInputsUpda
     }
     return headers;
   };
-return customFetch<PlannerInputs>(getUpdatePlannerInputsUrl(),
+return customFetch<PlannerInputs>(getUpdatePlannerInputsUrl(houseTypeId),
   {
     ...options,
     method: 'PUT',
@@ -435,9 +538,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePlannerInputs>>, UpdatePlannerInputsMutationVariables> = (props) => {
-          const {data} = props ?? {};
+          const {houseTypeId,data} = props ?? {};
 
-          return  updatePlannerInputs(data,requestOptions)
+          return  updatePlannerInputs(houseTypeId,data,requestOptions)
         }
 
 
@@ -450,10 +553,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdatePlannerInputsMutationResult = NonNullable<Awaited<ReturnType<typeof updatePlannerInputs>>>
     export type UpdatePlannerInputsMutationBody = BodyType<PlannerInputsUpdate>
     export type UpdatePlannerInputsMutationError = ErrorType<unknown>
-    export type UpdatePlannerInputsMutationVariables = {data: BodyType<PlannerInputsUpdate>}
+    export type UpdatePlannerInputsMutationVariables = {houseTypeId: string;data: BodyType<PlannerInputsUpdate>}
 
     /**
- * @summary Save one-house-unit planner assumptions
+ * @summary Save planner assumptions for a house type
  */
 export const useUpdatePlannerInputs = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlannerInputs>>, TError,UpdatePlannerInputsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

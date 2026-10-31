@@ -534,6 +534,102 @@ a { color: inherit; text-decoration: none; }
   --planner-eco: #4f795e;
   --planner-premium: #4e78a8;
 }
+.planner-house-type-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  max-width: 720px;
+  margin: -5px 0 12px;
+}
+.planner-house-type-tab {
+  min-height: 43px;
+  padding: 8px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: 600 12px var(--app-font-sans);
+  cursor: pointer;
+}
+.planner-house-type-tab[aria-selected="true"] {
+  border-color: hsl(var(--primary) / .7);
+  background: hsl(var(--primary) / .08);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / .18);
+}
+.planner-provisional-banner {
+  margin: 0 0 14px;
+  color: hsl(var(--muted-foreground));
+}
+.planner-land-inputs {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.planner-house-type-comparison {
+  margin-top: 22px;
+  padding: 17px;
+}
+.planner-house-type-table-wrap {
+  overflow-x: auto;
+}
+.planner-house-type-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  text-align: left;
+}
+.planner-house-type-table th,
+.planner-house-type-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  vertical-align: top;
+}
+.planner-house-type-table thead th {
+  color: hsl(var(--muted-foreground));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.planner-house-type-table tbody tr.is-selected {
+  background: hsl(var(--primary) / .06);
+}
+.planner-house-type-table tbody th {
+  min-width: 150px;
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 600;
+}
+.planner-house-type-table tbody td {
+  color: hsl(var(--foreground));
+  font: 500 10px var(--app-font-mono);
+}
+.planner-house-type-name {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+.planner-house-type-name .pill {
+  font-size: 8px;
+}
+.planner-house-type-pack-metrics {
+  display: grid;
+  gap: 5px;
+  min-width: 145px;
+}
+.planner-house-type-pack-metrics > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.planner-house-type-pack-metrics em {
+  color: hsl(var(--muted-foreground));
+  font: 400 9px var(--app-font-sans);
+}
+.planner-house-type-pack-metrics strong {
+  font: 500 9px var(--app-font-mono);
+  text-align: right;
+}
 .planner-pack-tab[data-pack="standard"],
 .planner-kpi[data-pack="standard"],
 .planner-waterfall[data-pack="standard"],
@@ -894,6 +990,8 @@ a { color: inherit; text-decoration: none; }
   .planner-comparison-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
+  .planner-house-type-tabs { gap: 5px; }
+  .planner-house-type-tab { min-height: 39px; padding: 7px 5px; font-size: 10px; }
   .planner-pack-tabs { gap: 5px; }
   .planner-pack-tab { min-height: 39px; gap: 5px; padding: 7px 5px; font-size: 10px; }
   .planner-kpi-grid { gap: 8px; margin-top: 14px; }
@@ -908,5 +1006,6 @@ a { color: inherit; text-decoration: none; }
   .planner-waterfall-percent { font-size: 9px; }
   .planner-comparison-grid { grid-template-columns: 1fr; }
   .planner-comparison-card { padding: 13px; }
+  .planner-house-type-comparison { padding: 13px; }
   .planner-viability-margin { font-size: 36px; }
 }

@@ -48,6 +48,7 @@ export * from './budgetSourceCheck';
 export * from './budgetSourceChild';
 export * from './budgetSourceSourceType';
 export * from './healthStatus';
+export * from './houseType';
 export * from './lineMarker';
 export * from './lineMarkerMarker';
 export * from './lineMarkerUpdate';

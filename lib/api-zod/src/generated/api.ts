@@ -42,9 +42,11 @@ export const GetBudgetDashboardResponse = zod.object({
 
 
 /**
- * @summary Read one-house-unit planner assumptions
+ * @summary List saved planner assumptions by house type
  */
-export const GetPlannerInputsResponse = zod.object({
+export const GetPlannerInputsResponseItem = zod.object({
+  "houseTypeId": zod.string(),
+  "landNote": zod.string().nullable(),
   "grossArea": zod.number().nullable(),
   "land": zod.number().nullable(),
   "designLicensing": zod.number().nullable(),
@@ -53,14 +55,34 @@ export const GetPlannerInputsResponse = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable()
+  "standardReferenceSellingPrice": zod.number().nullable(),
+  "ecoReferenceSellingPrice": zod.number().nullable(),
+  "premiumReferenceSellingPrice": zod.number().nullable()
 })
+export const GetPlannerInputsResponse = zod.array(GetPlannerInputsResponseItem)
 
 
 /**
- * @summary Save one-house-unit planner assumptions
+ * @summary List house types available in Planner
  */
+export const GetPlannerHouseTypesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "costBasis": zod.string()
+})
+export const GetPlannerHouseTypesResponse = zod.array(GetPlannerHouseTypesResponseItem)
+
+
+/**
+ * @summary Save planner assumptions for a house type
+ */
+export const UpdatePlannerInputsParams = zod.object({
+  "houseTypeId": zod.coerce.string()
+})
+
 export const UpdatePlannerInputsBody = zod.object({
+  "landNote": zod.string().nullable(),
   "grossArea": zod.number().nullable(),
   "land": zod.number().nullable(),
   "designLicensing": zod.number().nullable(),
@@ -69,10 +91,14 @@ export const UpdatePlannerInputsBody = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable()
+  "standardReferenceSellingPrice": zod.number().nullable(),
+  "ecoReferenceSellingPrice": zod.number().nullable(),
+  "premiumReferenceSellingPrice": zod.number().nullable()
 })
 
 export const UpdatePlannerInputsResponse = zod.object({
+  "houseTypeId": zod.string(),
+  "landNote": zod.string().nullable(),
   "grossArea": zod.number().nullable(),
   "land": zod.number().nullable(),
   "designLicensing": zod.number().nullable(),
@@ -81,7 +107,9 @@ export const UpdatePlannerInputsResponse = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable()
+  "standardReferenceSellingPrice": zod.number().nullable(),
+  "ecoReferenceSellingPrice": zod.number().nullable(),
+  "premiumReferenceSellingPrice": zod.number().nullable()
 })
 
 

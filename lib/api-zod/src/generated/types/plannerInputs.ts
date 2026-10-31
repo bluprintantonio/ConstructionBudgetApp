@@ -7,6 +7,9 @@
  */
 
 export interface PlannerInputs {
+  houseTypeId: string;
+  /** @nullable */
+  landNote: string | null;
   /** @nullable */
   grossArea: number | null;
   /** @nullable */
@@ -24,5 +27,9 @@ export interface PlannerInputs {
   /** @nullable */
   taxesPercent: number | null;
   /** @nullable */
-  referenceSellingPrice: number | null;
+  standardReferenceSellingPrice: number | null;
+  /** @nullable */
+  ecoReferenceSellingPrice: number | null;
+  /** @nullable */
+  premiumReferenceSellingPrice: number | null;
 }

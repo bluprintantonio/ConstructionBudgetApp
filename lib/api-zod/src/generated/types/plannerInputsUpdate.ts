@@ -8,6 +8,8 @@
 
 export interface PlannerInputsUpdate {
   /** @nullable */
+  landNote: string | null;
+  /** @nullable */
   grossArea: number | null;
   /** @nullable */
   land: number | null;
@@ -24,5 +26,9 @@ export interface PlannerInputsUpdate {
   /** @nullable */
   taxesPercent: number | null;
   /** @nullable */
-  referenceSellingPrice: number | null;
+  standardReferenceSellingPrice: number | null;
+  /** @nullable */
+  ecoReferenceSellingPrice: number | null;
+  /** @nullable */
+  premiumReferenceSellingPrice: number | null;
 }

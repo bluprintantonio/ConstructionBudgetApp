@@ -172,8 +172,17 @@ export const quoteLinksTable = pgTable(
   ],
 );
 
+export const houseTypesTable = pgTable("house_types", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  costBasis: text("cost_basis").notNull(),
+});
+
 export const plannerInputsTable = pgTable("planner_inputs", {
   id: text("id").primaryKey(),
+  houseTypeId: text("house_type_id").references(() => houseTypesTable.id),
+  landNote: text("land_note"),
   grossArea: real("gross_area"),
   land: real("land"),
   designLicensing: real("design_licensing"),
@@ -182,5 +191,9 @@ export const plannerInputsTable = pgTable("planner_inputs", {
   targetNetMarginPercent: real("target_net_margin_percent"),
   salesCommissionPercent: real("sales_commission_percent"),
   taxesPercent: real("taxes_percent"),
+  standardReferenceSellingPrice: real("standard_reference_selling_price"),
+  ecoReferenceSellingPrice: real("eco_reference_selling_price"),
+  premiumReferenceSellingPrice: real("premium_reference_selling_price"),
+  // Retained so the one-time per-type backfill can preserve the old value.
   referenceSellingPrice: real("reference_selling_price"),
 });

@@ -88,6 +88,9 @@ export interface BudgetDashboard {
 }
 
 export interface PlannerInputs {
+  houseTypeId: string;
+  /** @nullable */
+  landNote: string | null;
   /** @nullable */
   grossArea: number | null;
   /** @nullable */
@@ -105,11 +108,17 @@ export interface PlannerInputs {
   /** @nullable */
   taxesPercent: number | null;
   /** @nullable */
-  referenceSellingPrice: number | null;
+  standardReferenceSellingPrice: number | null;
+  /** @nullable */
+  ecoReferenceSellingPrice: number | null;
+  /** @nullable */
+  premiumReferenceSellingPrice: number | null;
 }
 
 export interface PlannerInputsUpdate {
   /** @nullable */
+  landNote: string | null;
+  /** @nullable */
   grossArea: number | null;
   /** @nullable */
   land: number | null;
@@ -126,7 +135,18 @@ export interface PlannerInputsUpdate {
   /** @nullable */
   taxesPercent: number | null;
   /** @nullable */
-  referenceSellingPrice: number | null;
+  standardReferenceSellingPrice: number | null;
+  /** @nullable */
+  ecoReferenceSellingPrice: number | null;
+  /** @nullable */
+  premiumReferenceSellingPrice: number | null;
+}
+
+export interface HouseType {
+  id: string;
+  name: string;
+  sortOrder: number;
+  costBasis: string;
 }
 
 export type BudgetLineStatus = typeof BudgetLineStatus[keyof typeof BudgetLineStatus];

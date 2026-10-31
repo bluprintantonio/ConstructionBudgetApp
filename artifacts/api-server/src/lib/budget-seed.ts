@@ -206,6 +206,27 @@ export const buildingTypes = [
   },
 ] as const;
 
+export const plannerHouseTypeSeedRows = [
+  {
+    id: "twin-villa",
+    name: "Twin villa",
+    sortOrder: 0,
+    costBasis: "Twin CSV",
+  },
+  {
+    id: "townhouse",
+    name: "Townhouse",
+    sortOrder: 1,
+    costBasis: "Twin CSV (provisional)",
+  },
+  {
+    id: "bungalow",
+    name: "Bungalow",
+    sortOrder: 2,
+    costBasis: "Twin CSV (provisional)",
+  },
+] as const;
+
 type BudgetLineSeed = Omit<
   BudgetLine,
   "createdAt" | "updatedAt" | "sourceUrl" | "marker"

@@ -10,6 +10,41 @@ export type PlannerInputs = {
   referenceSellingPrice: number | null;
 };
 
+export type PlannerPackId = "standard" | "eco" | "premium";
+
+export type HouseTypePlannerInputs = Omit<
+  PlannerInputs,
+  "referenceSellingPrice"
+> & {
+  standardReferenceSellingPrice: number | null;
+  ecoReferenceSellingPrice: number | null;
+  premiumReferenceSellingPrice: number | null;
+};
+
+export type PlannerPackTotals = Record<PlannerPackId, number>;
+
+export type HouseTypeComparisonInput = {
+  id: string;
+  name: string;
+  costBasis: string;
+  inputs: HouseTypePlannerInputs | null;
+};
+
+export type HouseTypeComparisonPack = Pick<
+  PlannerPackResult,
+  "netProfit" | "netMargin" | "roi"
+>;
+
+export type HouseTypeComparisonRow = {
+  id: string;
+  name: string;
+  costBasis: string;
+  land: number | null;
+  standard: HouseTypeComparisonPack;
+  eco: HouseTypeComparisonPack;
+  premium: HouseTypeComparisonPack;
+};
+
 export type PlannerPackResult = {
   managementFee: number | null;
   indirectCosts: number | null;
@@ -151,6 +186,79 @@ export function calculatePlanner(
     viable: netProfit === null ? null : netProfit > 0,
     costPerSquareMeter,
   };
+}
+
+export function inputsForPack(
+  inputs: HouseTypePlannerInputs,
+  pack: PlannerPackId,
+): PlannerInputs {
+  const referenceSellingPrice = {
+    standard: inputs.standardReferenceSellingPrice,
+    eco: inputs.ecoReferenceSellingPrice,
+    premium: inputs.premiumReferenceSellingPrice,
+  }[pack];
+
+  return { ...inputs, referenceSellingPrice };
+}
+
+export function calculatePlannerPackResults(
+  packTotals: PlannerPackTotals,
+  inputs: HouseTypePlannerInputs,
+): Record<PlannerPackId, PlannerPackResult> {
+  return {
+    standard: calculatePlanner(
+      packTotals.standard,
+      inputsForPack(inputs, "standard"),
+    ),
+    eco: calculatePlanner(packTotals.eco, inputsForPack(inputs, "eco")),
+    premium: calculatePlanner(
+      packTotals.premium,
+      inputsForPack(inputs, "premium"),
+    ),
+  };
+}
+
+export function calculateHouseTypeComparisonRows(
+  packTotals: PlannerPackTotals,
+  houseTypes: HouseTypeComparisonInput[],
+): HouseTypeComparisonRow[] {
+  return houseTypes.map((houseType) => {
+    if (houseType.inputs === null) {
+      const blankMetrics = { netProfit: null, netMargin: null, roi: null };
+      return {
+        id: houseType.id,
+        name: houseType.name,
+        costBasis: houseType.costBasis,
+        land: null,
+        standard: blankMetrics,
+        eco: blankMetrics,
+        premium: blankMetrics,
+      };
+    }
+
+    const results = calculatePlannerPackResults(packTotals, houseType.inputs);
+    return {
+      id: houseType.id,
+      name: houseType.name,
+      costBasis: houseType.costBasis,
+      land: houseType.inputs.land,
+      standard: {
+        netProfit: results.standard.netProfit,
+        netMargin: results.standard.netMargin,
+        roi: results.standard.roi,
+      },
+      eco: {
+        netProfit: results.eco.netProfit,
+        netMargin: results.eco.netMargin,
+        roi: results.eco.roi,
+      },
+      premium: {
+        netProfit: results.premium.netProfit,
+        netMargin: results.premium.netMargin,
+        roi: results.premium.roi,
+      },
+    };
+  });
 }
 
 function waterfallRow(

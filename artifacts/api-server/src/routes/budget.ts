@@ -8,6 +8,7 @@ import {
   budgetMetaTable,
   budgetQuotesTable,
   extrasTable,
+  houseTypesTable,
   lineMarkersTable,
   plannerInputsTable,
   quoteLinksTable,
@@ -29,10 +30,12 @@ import {
   GetBudgetQuoteLinksResponse,
   GetBudgetQuotesResponse,
   GetBudgetSourcesResponse,
+  GetPlannerHouseTypesResponse,
   GetPlannerInputsResponse,
   ImportBudgetLinesBody,
   ImportBudgetLinesResponse,
   UpdatePlannerInputsBody,
+  UpdatePlannerInputsParams,
   UpdatePlannerInputsResponse,
   UpdateBudgetLineBody,
   UpdateBudgetLineParams,
@@ -67,18 +70,6 @@ const connectors = new ReplitConnectors();
 let seedPromise: Promise<void> | undefined;
 let extrasSeedPromise: Promise<void> | undefined;
 let lineMarkerSeedPromise: Promise<void> | undefined;
-const PLANNER_INPUTS_ID = "one-house-unit";
-const EMPTY_PLANNER_INPUTS = {
-  grossArea: null,
-  land: null,
-  designLicensing: null,
-  managementPercent: null,
-  contingencyPercent: null,
-  targetNetMarginPercent: null,
-  salesCommissionPercent: null,
-  taxesPercent: null,
-  referenceSellingPrice: null,
-};
 
 type DriveFileMetadata = {
   name?: string;
@@ -521,39 +512,65 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
 });
 
 router.get("/budget/planner-inputs", async (_req, res): Promise<void> => {
-  const [row] = await db
+  const rows = await db
     .select()
     .from(plannerInputsTable)
-    .where(eq(plannerInputsTable.id, PLANNER_INPUTS_ID))
-    .limit(1);
-  res.json(
-    GetPlannerInputsResponse.parse(
-      row
-        ? {
-            grossArea: row.grossArea,
-            land: row.land,
-            designLicensing: row.designLicensing,
-            managementPercent: row.managementPercent,
-            contingencyPercent: row.contingencyPercent,
-            targetNetMarginPercent: row.targetNetMarginPercent,
-            salesCommissionPercent: row.salesCommissionPercent,
-            taxesPercent: row.taxesPercent,
-            referenceSellingPrice: row.referenceSellingPrice,
-          }
-        : EMPTY_PLANNER_INPUTS,
-    ),
-  );
+    .where(isNotNull(plannerInputsTable.houseTypeId))
+    .orderBy(asc(plannerInputsTable.houseTypeId));
+  res.json(GetPlannerInputsResponse.parse(rows.map((row) => ({
+    houseTypeId: row.houseTypeId!,
+    landNote: row.landNote,
+    grossArea: row.grossArea,
+    land: row.land,
+    designLicensing: row.designLicensing,
+    managementPercent: row.managementPercent,
+    contingencyPercent: row.contingencyPercent,
+    targetNetMarginPercent: row.targetNetMarginPercent,
+    salesCommissionPercent: row.salesCommissionPercent,
+    taxesPercent: row.taxesPercent,
+    standardReferenceSellingPrice: row.standardReferenceSellingPrice,
+    ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
+    premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
+  }))));
 });
 
-router.put("/budget/planner-inputs", async (req, res): Promise<void> => {
+router.get("/budget/house-types", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(houseTypesTable)
+    .orderBy(asc(houseTypesTable.sortOrder), asc(houseTypesTable.name));
+  res.json(GetPlannerHouseTypesResponse.parse(rows));
+});
+
+router.put(
+  "/budget/planner-inputs/:houseTypeId",
+  async (req, res): Promise<void> => {
+  const parsedParams = UpdatePlannerInputsParams.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: parsedParams.error.message });
+    return;
+  }
   const parsed = UpdatePlannerInputsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const [houseType] = await db
+    .select({ id: houseTypesTable.id })
+    .from(houseTypesTable)
+    .where(eq(houseTypesTable.id, parsedParams.data.houseTypeId))
+    .limit(1);
+  if (!houseType) {
+    res.status(404).json({ error: "House type not found" });
+    return;
+  }
   const [row] = await db
     .insert(plannerInputsTable)
-    .values({ id: PLANNER_INPUTS_ID, ...parsed.data })
+    .values({
+      id: parsedParams.data.houseTypeId,
+      houseTypeId: parsedParams.data.houseTypeId,
+      ...parsed.data,
+    })
     .onConflictDoUpdate({
       target: plannerInputsTable.id,
       set: parsed.data,
@@ -561,6 +578,8 @@ router.put("/budget/planner-inputs", async (req, res): Promise<void> => {
     .returning();
   res.json(
     UpdatePlannerInputsResponse.parse({
+      houseTypeId: row.houseTypeId,
+      landNote: row.landNote,
       grossArea: row.grossArea,
       land: row.land,
       designLicensing: row.designLicensing,
@@ -569,10 +588,13 @@ router.put("/budget/planner-inputs", async (req, res): Promise<void> => {
       targetNetMarginPercent: row.targetNetMarginPercent,
       salesCommissionPercent: row.salesCommissionPercent,
       taxesPercent: row.taxesPercent,
-      referenceSellingPrice: row.referenceSellingPrice,
+      standardReferenceSellingPrice: row.standardReferenceSellingPrice,
+      ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
+      premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
     }),
   );
-});
+  },
+);
 
 router.get("/budget/projects", async (_req, res): Promise<void> => {
   res.json(GetBudgetProjectsResponse.parse(buildingTypes));

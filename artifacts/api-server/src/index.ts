@@ -1,7 +1,13 @@
 import app from "./app";
 import { and, isNotNull, isNull, sql } from "drizzle-orm";
-import { budgetQuotesTable, db } from "@workspace/db";
+import {
+  budgetQuotesTable,
+  db,
+  houseTypesTable,
+  plannerInputsTable,
+} from "@workspace/db";
 import { logger } from "./lib/logger";
+import { plannerHouseTypeSeedRows } from "./lib/budget-seed";
 
 const rawPort = process.env["PORT"];
 
@@ -18,6 +24,22 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function startServer(): Promise<void> {
+  await db
+    .insert(houseTypesTable)
+    .values([...plannerHouseTypeSeedRows])
+    .onConflictDoNothing({ target: houseTypesTable.id });
+
+  await db
+    .update(plannerInputsTable)
+    .set({
+      id: "twin-villa",
+      houseTypeId: "twin-villa",
+      standardReferenceSellingPrice: sql`COALESCE(${plannerInputsTable.standardReferenceSellingPrice}, ${plannerInputsTable.referenceSellingPrice})`,
+      ecoReferenceSellingPrice: sql`COALESCE(${plannerInputsTable.ecoReferenceSellingPrice}, ${plannerInputsTable.referenceSellingPrice})`,
+      premiumReferenceSellingPrice: sql`COALESCE(${plannerInputsTable.premiumReferenceSellingPrice}, ${plannerInputsTable.referenceSellingPrice})`,
+    })
+    .where(isNull(plannerInputsTable.houseTypeId));
+
   await db
     .update(budgetQuotesTable)
     .set({ driveUrl: sql`${budgetQuotesTable.sourceUrl}` })

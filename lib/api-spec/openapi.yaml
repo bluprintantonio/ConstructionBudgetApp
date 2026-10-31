@@ -42,18 +42,41 @@ paths:
     get:
       operationId: getPlannerInputs
       tags: [budget]
-      summary: Read one-house-unit planner assumptions
+      summary: List saved planner assumptions by house type
       responses:
         "200":
-          description: Planner assumptions, blank until saved
+          description: Saved Planner assumptions by house type
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PlannerInputs"
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlannerInputs"
+  /budget/house-types:
+    get:
+      operationId: getPlannerHouseTypes
+      tags: [budget]
+      summary: List house types available in Planner
+      responses:
+        "200":
+          description: Ordered house types and their cost bases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HouseType"
+  /budget/planner-inputs/{houseTypeId}:
     put:
       operationId: updatePlannerInputs
       tags: [budget]
-      summary: Save one-house-unit planner assumptions
+      summary: Save planner assumptions for a house type
+      parameters:
+        - name: houseTypeId
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -470,6 +493,8 @@ components:
     PlannerInputs:
       type: object
       properties:
+        houseTypeId: { type: string }
+        landNote: { type: ["string", "null"] }
         grossArea: { type: ["number", "null"] }
         land: { type: ["number", "null"] }
         designLicensing: { type: ["number", "null"] }
@@ -478,11 +503,14 @@ components:
         targetNetMarginPercent: { type: ["number", "null"] }
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
-        referenceSellingPrice: { type: ["number", "null"] }
-      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
+        standardReferenceSellingPrice: { type: ["number", "null"] }
+        ecoReferenceSellingPrice: { type: ["number", "null"] }
+        premiumReferenceSellingPrice: { type: ["number", "null"] }
+      required: [houseTypeId, landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice]
     PlannerInputsUpdate:
       type: object
       properties:
+        landNote: { type: ["string", "null"] }
         grossArea: { type: ["number", "null"] }
         land: { type: ["number", "null"] }
         designLicensing: { type: ["number", "null"] }
@@ -491,8 +519,18 @@ components:
         targetNetMarginPercent: { type: ["number", "null"] }
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
-        referenceSellingPrice: { type: ["number", "null"] }
-      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
+        standardReferenceSellingPrice: { type: ["number", "null"] }
+        ecoReferenceSellingPrice: { type: ["number", "null"] }
+        premiumReferenceSellingPrice: { type: ["number", "null"] }
+      required: [landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice]
+    HouseType:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sortOrder: { type: integer }
+        costBasis: { type: string }
+      required: [id, name, sortOrder, costBasis]
     BudgetLine:
       type: object
       properties:
