@@ -1009,3 +1009,133 @@ a { color: inherit; text-decoration: none; }
   .planner-house-type-comparison { padding: 13px; }
   .planner-viability-margin { font-size: 36px; }
 }
+
+.planner-sale-prices {
+  margin: 0 0 18px;
+  overflow: hidden;
+}
+.planner-sale-prices-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 18px 14px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.planner-sale-prices-header h2 {
+  margin: 5px 0 0;
+  font: 700 19px var(--app-font-display);
+  letter-spacing: -.03em;
+}
+.planner-sale-prices-header p {
+  margin: 6px 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+.planner-sale-price-table-wrap {
+  overflow-x: auto;
+}
+.planner-sale-price-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  text-align: left;
+}
+.planner-sale-price-table th,
+.planner-sale-price-table td {
+  padding: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  vertical-align: top;
+}
+.planner-sale-price-table thead th {
+  color: hsl(var(--muted-foreground));
+  font: 700 9px var(--app-font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.planner-sale-price-table tbody th {
+  width: 150px;
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 600;
+}
+.planner-sale-price-table tbody tr:nth-child(even) {
+  background: hsl(var(--secondary) / .28);
+}
+.planner-sale-price-cell {
+  display: grid;
+  gap: 7px;
+  min-width: 230px;
+}
+.planner-sale-price-input-label input,
+.planner-sale-price-note-label input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  outline: 0;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.planner-sale-price-input-label input {
+  font: 600 12px var(--app-font-mono);
+}
+.planner-sale-price-note-label input {
+  font-size: 9px;
+}
+.planner-sale-price-note-label input::placeholder {
+  color: hsl(var(--muted-foreground) / .8);
+}
+.planner-sale-price-input-label input:focus,
+.planner-sale-price-note-label input:focus {
+  border-color: hsl(var(--primary) / .7);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / .1);
+}
+.planner-sale-price-unsaved {
+  justify-self: start;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: hsl(37 70% 90%);
+  color: hsl(29 62% 31%);
+  font: 8px var(--app-font-mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.planner-sale-price-metrics {
+  display: grid;
+  gap: 5px;
+  padding-top: 3px;
+}
+.planner-sale-price-metrics > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 9px;
+}
+.planner-sale-price-metrics strong {
+  margin-left: auto;
+  color: hsl(var(--foreground));
+  font: 500 10px var(--app-font-mono);
+}
+.planner-provisional-roi {
+  padding: 3px 5px;
+  font-size: 7px;
+}
+.planner-sale-price-actions {
+  justify-content: flex-end;
+  padding: 11px 14px 14px;
+}
+.planner-sale-prices .inline-message {
+  margin: 11px 14px 0;
+}
+@media (max-width: 560px) {
+  .planner-sale-prices-header { padding: 14px 13px 12px; }
+  .planner-sale-price-table th,
+  .planner-sale-price-table td { padding: 9px; }
+  .planner-sale-price-table tbody th { width: 120px; }
+  .planner-sale-price-cell { min-width: 210px; }
+}

@@ -23,6 +23,11 @@ export type HouseTypePlannerInputs = Omit<
 
 export type PlannerPackTotals = Record<PlannerPackId, number>;
 
+export type PlannerSalePriceMetrics = {
+  roi: number | null;
+  salePricePerSquareMeter: number | null;
+};
+
 export type HouseTypeComparisonInput = {
   id: string;
   name: string;
@@ -215,6 +220,29 @@ export function calculatePlannerPackResults(
       packTotals.premium,
       inputsForPack(inputs, "premium"),
     ),
+  };
+}
+
+export function calculateSalePriceMetrics(
+  packTotal: number,
+  inputs: HouseTypePlannerInputs | null,
+  pack: PlannerPackId,
+  salePrice: number | null,
+): PlannerSalePriceMetrics {
+  if (inputs === null || salePrice === null) {
+    return { roi: null, salePricePerSquareMeter: null };
+  }
+
+  const result = calculatePlanner(packTotal, {
+    ...inputsForPack(inputs, pack),
+    referenceSellingPrice: salePrice,
+  });
+  return {
+    roi: result.roi,
+    salePricePerSquareMeter:
+      inputs.grossArea === null || inputs.grossArea === 0
+        ? null
+        : salePrice / inputs.grossArea,
   };
 }
 

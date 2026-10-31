@@ -37,6 +37,8 @@ import {
   UpdatePlannerInputsBody,
   UpdatePlannerInputsParams,
   UpdatePlannerInputsResponse,
+  UpdatePlannerSalePricesBody,
+  UpdatePlannerSalePricesResponse,
   UpdateBudgetLineBody,
   UpdateBudgetLineParams,
   UpdateBudgetLineResponse,
@@ -531,6 +533,9 @@ router.get("/budget/planner-inputs", async (_req, res): Promise<void> => {
     standardReferenceSellingPrice: row.standardReferenceSellingPrice,
     ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
     premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
+    priceNoteStandard: row.priceNoteStandard,
+    priceNoteEco: row.priceNoteEco,
+    priceNotePremium: row.priceNotePremium,
   }))));
 });
 
@@ -591,10 +596,83 @@ router.put(
       standardReferenceSellingPrice: row.standardReferenceSellingPrice,
       ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
       premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
+      priceNoteStandard: row.priceNoteStandard,
+      priceNoteEco: row.priceNoteEco,
+      priceNotePremium: row.priceNotePremium,
     }),
   );
   },
 );
+
+router.put("/budget/planner-sale-prices", async (req, res): Promise<void> => {
+  const parsed = UpdatePlannerSalePricesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const rows = parsed.data.rows;
+  const houseTypeIds = rows.map((row) => row.houseTypeId);
+  if (new Set(houseTypeIds).size !== houseTypeIds.length) {
+    res.status(400).json({ error: "Each house type can appear only once." });
+    return;
+  }
+  if (rows.length === 0) {
+    res.json(UpdatePlannerSalePricesResponse.parse([]));
+    return;
+  }
+
+  const knownHouseTypes = await db
+    .select({ id: houseTypesTable.id })
+    .from(houseTypesTable)
+    .where(inArray(houseTypesTable.id, houseTypeIds));
+  if (knownHouseTypes.length !== houseTypeIds.length) {
+    res.status(404).json({ error: "House type not found" });
+    return;
+  }
+
+  const savedRows = await db.transaction(async (tx) => {
+    const saved = [];
+    for (const row of rows) {
+      const [savedRow] = await tx
+        .insert(plannerInputsTable)
+        .values({
+          id: row.houseTypeId,
+          houseTypeId: row.houseTypeId,
+          standardReferenceSellingPrice: row.standardReferenceSellingPrice,
+          ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
+          premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
+          priceNoteStandard: row.priceNoteStandard,
+          priceNoteEco: row.priceNoteEco,
+          priceNotePremium: row.priceNotePremium,
+        })
+        .onConflictDoUpdate({
+          target: plannerInputsTable.id,
+          set: {
+            standardReferenceSellingPrice: row.standardReferenceSellingPrice,
+            ecoReferenceSellingPrice: row.ecoReferenceSellingPrice,
+            premiumReferenceSellingPrice: row.premiumReferenceSellingPrice,
+            priceNoteStandard: row.priceNoteStandard,
+            priceNoteEco: row.priceNoteEco,
+            priceNotePremium: row.priceNotePremium,
+          },
+        })
+        .returning();
+      saved.push({
+        houseTypeId: savedRow.houseTypeId!,
+        standardReferenceSellingPrice: savedRow.standardReferenceSellingPrice,
+        ecoReferenceSellingPrice: savedRow.ecoReferenceSellingPrice,
+        premiumReferenceSellingPrice: savedRow.premiumReferenceSellingPrice,
+        priceNoteStandard: savedRow.priceNoteStandard,
+        priceNoteEco: savedRow.priceNoteEco,
+        priceNotePremium: savedRow.priceNotePremium,
+      });
+    }
+    return saved;
+  });
+
+  res.json(UpdatePlannerSalePricesResponse.parse(savedRows));
+});
 
 router.get("/budget/projects", async (_req, res): Promise<void> => {
   res.json(GetBudgetProjectsResponse.parse(buildingTypes));

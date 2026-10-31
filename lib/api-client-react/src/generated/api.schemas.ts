@@ -113,6 +113,12 @@ export interface PlannerInputs {
   ecoReferenceSellingPrice: number | null;
   /** @nullable */
   premiumReferenceSellingPrice: number | null;
+  /** @nullable */
+  priceNoteStandard: string | null;
+  /** @nullable */
+  priceNoteEco: string | null;
+  /** @nullable */
+  priceNotePremium: string | null;
 }
 
 export interface PlannerInputsUpdate {
@@ -134,12 +140,26 @@ export interface PlannerInputsUpdate {
   salesCommissionPercent: number | null;
   /** @nullable */
   taxesPercent: number | null;
+}
+
+export interface PlannerSalePriceRow {
+  houseTypeId: string;
   /** @nullable */
   standardReferenceSellingPrice: number | null;
   /** @nullable */
   ecoReferenceSellingPrice: number | null;
   /** @nullable */
   premiumReferenceSellingPrice: number | null;
+  /** @nullable */
+  priceNoteStandard: string | null;
+  /** @nullable */
+  priceNoteEco: string | null;
+  /** @nullable */
+  priceNotePremium: string | null;
+}
+
+export interface PlannerSalePricesUpdate {
+  rows: PlannerSalePriceRow[];
 }
 
 export interface HouseType {

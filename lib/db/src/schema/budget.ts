@@ -194,6 +194,9 @@ export const plannerInputsTable = pgTable("planner_inputs", {
   standardReferenceSellingPrice: real("standard_reference_selling_price"),
   ecoReferenceSellingPrice: real("eco_reference_selling_price"),
   premiumReferenceSellingPrice: real("premium_reference_selling_price"),
+  priceNoteStandard: text("price_note_standard"),
+  priceNoteEco: text("price_note_eco"),
+  priceNotePremium: text("price_note_premium"),
   // Retained so the one-time per-type backfill can preserve the old value.
   referenceSellingPrice: real("reference_selling_price"),
 });

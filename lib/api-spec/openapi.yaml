@@ -90,6 +90,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlannerInputs"
+  /budget/planner-sale-prices:
+    put:
+      operationId: updatePlannerSalePrices
+      tags: [budget]
+      summary: Save sale prices and notes for house types
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlannerSalePricesUpdate"
+      responses:
+        "200":
+          description: Saved sale prices and notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlannerSalePriceRow"
+        "400":
+          description: Invalid or duplicate house type
+        "404":
+          description: House type not found
   /budget/projects:
     get:
       operationId: getBudgetProjects
@@ -506,7 +530,10 @@ components:
         standardReferenceSellingPrice: { type: ["number", "null"] }
         ecoReferenceSellingPrice: { type: ["number", "null"] }
         premiumReferenceSellingPrice: { type: ["number", "null"] }
-      required: [houseTypeId, landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice]
+        priceNoteStandard: { type: ["string", "null"] }
+        priceNoteEco: { type: ["string", "null"] }
+        priceNotePremium: { type: ["string", "null"] }
+      required: [houseTypeId, landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice, priceNoteStandard, priceNoteEco, priceNotePremium]
     PlannerInputsUpdate:
       type: object
       properties:
@@ -519,10 +546,26 @@ components:
         targetNetMarginPercent: { type: ["number", "null"] }
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
+      required: [landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent]
+    PlannerSalePriceRow:
+      type: object
+      properties:
+        houseTypeId: { type: string }
         standardReferenceSellingPrice: { type: ["number", "null"] }
         ecoReferenceSellingPrice: { type: ["number", "null"] }
         premiumReferenceSellingPrice: { type: ["number", "null"] }
-      required: [landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice]
+        priceNoteStandard: { type: ["string", "null"] }
+        priceNoteEco: { type: ["string", "null"] }
+        priceNotePremium: { type: ["string", "null"] }
+      required: [houseTypeId, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice, priceNoteStandard, priceNoteEco, priceNotePremium]
+    PlannerSalePricesUpdate:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannerSalePriceRow"
+      required: [rows]
     HouseType:
       type: object
       properties:

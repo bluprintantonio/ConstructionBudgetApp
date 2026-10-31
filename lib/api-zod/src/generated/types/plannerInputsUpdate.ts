@@ -25,10 +25,4 @@ export interface PlannerInputsUpdate {
   salesCommissionPercent: number | null;
   /** @nullable */
   taxesPercent: number | null;
-  /** @nullable */
-  standardReferenceSellingPrice: number | null;
-  /** @nullable */
-  ecoReferenceSellingPrice: number | null;
-  /** @nullable */
-  premiumReferenceSellingPrice: number | null;
 }

@@ -57,7 +57,10 @@ export const GetPlannerInputsResponseItem = zod.object({
   "taxesPercent": zod.number().nullable(),
   "standardReferenceSellingPrice": zod.number().nullable(),
   "ecoReferenceSellingPrice": zod.number().nullable(),
-  "premiumReferenceSellingPrice": zod.number().nullable()
+  "premiumReferenceSellingPrice": zod.number().nullable(),
+  "priceNoteStandard": zod.string().nullable(),
+  "priceNoteEco": zod.string().nullable(),
+  "priceNotePremium": zod.string().nullable()
 })
 export const GetPlannerInputsResponse = zod.array(GetPlannerInputsResponseItem)
 
@@ -90,10 +93,7 @@ export const UpdatePlannerInputsBody = zod.object({
   "contingencyPercent": zod.number().nullable(),
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
-  "taxesPercent": zod.number().nullable(),
-  "standardReferenceSellingPrice": zod.number().nullable(),
-  "ecoReferenceSellingPrice": zod.number().nullable(),
-  "premiumReferenceSellingPrice": zod.number().nullable()
+  "taxesPercent": zod.number().nullable()
 })
 
 export const UpdatePlannerInputsResponse = zod.object({
@@ -109,8 +109,38 @@ export const UpdatePlannerInputsResponse = zod.object({
   "taxesPercent": zod.number().nullable(),
   "standardReferenceSellingPrice": zod.number().nullable(),
   "ecoReferenceSellingPrice": zod.number().nullable(),
-  "premiumReferenceSellingPrice": zod.number().nullable()
+  "premiumReferenceSellingPrice": zod.number().nullable(),
+  "priceNoteStandard": zod.string().nullable(),
+  "priceNoteEco": zod.string().nullable(),
+  "priceNotePremium": zod.string().nullable()
 })
+
+
+/**
+ * @summary Save sale prices and notes for house types
+ */
+export const UpdatePlannerSalePricesBody = zod.object({
+  "rows": zod.array(zod.object({
+  "houseTypeId": zod.string(),
+  "standardReferenceSellingPrice": zod.number().nullable(),
+  "ecoReferenceSellingPrice": zod.number().nullable(),
+  "premiumReferenceSellingPrice": zod.number().nullable(),
+  "priceNoteStandard": zod.string().nullable(),
+  "priceNoteEco": zod.string().nullable(),
+  "priceNotePremium": zod.string().nullable()
+}))
+})
+
+export const UpdatePlannerSalePricesResponseItem = zod.object({
+  "houseTypeId": zod.string(),
+  "standardReferenceSellingPrice": zod.number().nullable(),
+  "ecoReferenceSellingPrice": zod.number().nullable(),
+  "premiumReferenceSellingPrice": zod.number().nullable(),
+  "priceNoteStandard": zod.string().nullable(),
+  "priceNoteEco": zod.string().nullable(),
+  "priceNotePremium": zod.string().nullable()
+})
+export const UpdatePlannerSalePricesResponse = zod.array(UpdatePlannerSalePricesResponseItem)
 
 
 /**

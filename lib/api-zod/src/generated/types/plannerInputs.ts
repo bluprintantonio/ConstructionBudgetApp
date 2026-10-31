@@ -32,4 +32,10 @@ export interface PlannerInputs {
   ecoReferenceSellingPrice: number | null;
   /** @nullable */
   premiumReferenceSellingPrice: number | null;
+  /** @nullable */
+  priceNoteStandard: string | null;
+  /** @nullable */
+  priceNoteEco: string | null;
+  /** @nullable */
+  priceNotePremium: string | null;
 }

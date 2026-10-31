@@ -55,3 +55,5 @@ export * from './lineMarkerUpdate';
 export * from './lineMarkerUpdateMarker';
 export * from './plannerInputs';
 export * from './plannerInputsUpdate';
+export * from './plannerSalePriceRow';
+export * from './plannerSalePricesUpdate';

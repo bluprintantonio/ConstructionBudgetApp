@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, Check, Save } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,16 +8,19 @@ import {
   useGetPlannerHouseTypes,
   useGetPlannerInputs,
   useUpdatePlannerInputs,
+  useUpdatePlannerSalePrices,
 } from "@workspace/api-client-react";
 import type {
   PlannerInputs,
   PlannerInputsUpdate,
+  PlannerSalePriceRow,
 } from "@workspace/api-client-react";
 import { calculatePackTotals } from "@workspace/engine/packs";
 import {
   calculateHouseTypeComparisonRows,
   calculatePlannerPackResults,
   calculatePlannerPresentation,
+  calculateSalePriceMetrics,
   inputsForPack,
   type HouseTypePlannerInputs,
   type PlannerConstructionBreakdown,
@@ -42,21 +45,6 @@ const fieldDefinitions: {
   { key: "targetNetMarginPercent", label: "Target NET margin (%)", step: "0.01" },
   { key: "salesCommissionPercent", label: "Sales commission (%)", step: "0.01" },
   { key: "taxesPercent", label: "Taxes (%)", step: "0.01" },
-  {
-    key: "standardReferenceSellingPrice",
-    label: "Standard reference selling price",
-    step: "0.01",
-  },
-  {
-    key: "ecoReferenceSellingPrice",
-    label: "Eco reference selling price",
-    step: "0.01",
-  },
-  {
-    key: "premiumReferenceSellingPrice",
-    label: "Premium reference selling price",
-    step: "0.01",
-  },
 ];
 
 const emptyDraft: PlannerDraft = {
@@ -68,9 +56,6 @@ const emptyDraft: PlannerDraft = {
   targetNetMarginPercent: "",
   salesCommissionPercent: "",
   taxesPercent: "",
-  standardReferenceSellingPrice: "",
-  ecoReferenceSellingPrice: "",
-  premiumReferenceSellingPrice: "",
 };
 
 const packDefinitions = [
@@ -79,6 +64,99 @@ const packDefinitions = [
   { id: "premium", label: "Premium" },
 ] as const;
 type PackId = (typeof packDefinitions)[number]["id"];
+
+type SalePriceCellDraft = {
+  price: string;
+  note: string;
+};
+type SalePriceDraft = Record<PackId, SalePriceCellDraft>;
+type SalePriceDrafts = Record<string, SalePriceDraft>;
+type SalePriceCellField = keyof SalePriceCellDraft;
+
+function nullableNumberText(value: number | null | undefined): string {
+  return value == null ? "" : String(value);
+}
+
+function nullableText(value: string | null | undefined): string {
+  return value ?? "";
+}
+
+function salePriceDraftFromInputs(inputs?: PlannerInputs): SalePriceDraft {
+  return {
+    standard: {
+      price: nullableNumberText(inputs?.standardReferenceSellingPrice),
+      note: nullableText(inputs?.priceNoteStandard),
+    },
+    eco: {
+      price: nullableNumberText(inputs?.ecoReferenceSellingPrice),
+      note: nullableText(inputs?.priceNoteEco),
+    },
+    premium: {
+      price: nullableNumberText(inputs?.premiumReferenceSellingPrice),
+      note: nullableText(inputs?.priceNotePremium),
+    },
+  };
+}
+
+function nullableNumber(value: string): number | null {
+  return value.trim() === "" ? null : Number(value);
+}
+
+function nullableNote(value: string): string | null {
+  return value.trim() === "" ? null : value;
+}
+
+function savedSalePrice(inputs: PlannerInputs | undefined, pack: PackId): number | null {
+  if (!inputs) return null;
+  return {
+    standard: inputs.standardReferenceSellingPrice,
+    eco: inputs.ecoReferenceSellingPrice,
+    premium: inputs.premiumReferenceSellingPrice,
+  }[pack];
+}
+
+function savedSalePriceNote(
+  inputs: PlannerInputs | undefined,
+  pack: PackId,
+): string | null {
+  if (!inputs) return null;
+  return {
+    standard: inputs.priceNoteStandard,
+    eco: inputs.priceNoteEco,
+    premium: inputs.priceNotePremium,
+  }[pack];
+}
+
+function salePriceCellIsDirty(
+  draft: SalePriceCellDraft,
+  savedInputs: PlannerInputs | undefined,
+  pack: PackId,
+): boolean {
+  const draftPrice = nullableNumber(draft.price);
+  const savedPrice = savedSalePrice(savedInputs, pack);
+  const priceChanged = Number.isNaN(draftPrice)
+    ? true
+    : draftPrice !== savedPrice;
+  return (
+    priceChanged ||
+    nullableNote(draft.note) !== savedSalePriceNote(savedInputs, pack)
+  );
+}
+
+function salePriceRowFromDraft(
+  houseTypeId: string,
+  draft: SalePriceDraft,
+): PlannerSalePriceRow {
+  return {
+    houseTypeId,
+    standardReferenceSellingPrice: nullableNumber(draft.standard.price),
+    ecoReferenceSellingPrice: nullableNumber(draft.eco.price),
+    premiumReferenceSellingPrice: nullableNumber(draft.premium.price),
+    priceNoteStandard: nullableNote(draft.standard.note),
+    priceNoteEco: nullableNote(draft.eco.note),
+    priceNotePremium: nullableNote(draft.premium.note),
+  };
+}
 
 function constructionBreakdown(pack: {
   total: number;
@@ -115,18 +193,6 @@ function draftFromInputs(inputs?: PlannerInputs): PlannerDraft {
         : String(inputs.salesCommissionPercent),
     taxesPercent:
       inputs?.taxesPercent == null ? "" : String(inputs.taxesPercent),
-    standardReferenceSellingPrice:
-      inputs?.standardReferenceSellingPrice == null
-        ? ""
-        : String(inputs.standardReferenceSellingPrice),
-    ecoReferenceSellingPrice:
-      inputs?.ecoReferenceSellingPrice == null
-        ? ""
-        : String(inputs.ecoReferenceSellingPrice),
-    premiumReferenceSellingPrice:
-      inputs?.premiumReferenceSellingPrice == null
-        ? ""
-        : String(inputs.premiumReferenceSellingPrice),
   };
 }
 
@@ -146,21 +212,20 @@ function inputsFromDraft(
     targetNetMarginPercent: parseValue(draft.targetNetMarginPercent),
     salesCommissionPercent: parseValue(draft.salesCommissionPercent),
     taxesPercent: parseValue(draft.taxesPercent),
-    standardReferenceSellingPrice: parseValue(
-      draft.standardReferenceSellingPrice,
-    ),
-    ecoReferenceSellingPrice: parseValue(draft.ecoReferenceSellingPrice),
-    premiumReferenceSellingPrice: parseValue(
-      draft.premiumReferenceSellingPrice,
-    ),
   };
 }
 
 function engineInputsFromUpdate(
   inputs: PlannerInputsUpdate,
+  salePrices: SalePriceDraft,
 ): HouseTypePlannerInputs {
   const { landNote: _landNote, ...engineInputs } = inputs;
-  return engineInputs;
+  return {
+    ...engineInputs,
+    standardReferenceSellingPrice: nullableNumber(salePrices.standard.price),
+    ecoReferenceSellingPrice: nullableNumber(salePrices.eco.price),
+    premiumReferenceSellingPrice: nullableNumber(salePrices.premium.price),
+  };
 }
 
 function engineInputsFromSaved(
@@ -179,6 +244,20 @@ function engineInputsFromSaved(
     standardReferenceSellingPrice: inputs.standardReferenceSellingPrice,
     ecoReferenceSellingPrice: inputs.ecoReferenceSellingPrice,
     premiumReferenceSellingPrice: inputs.premiumReferenceSellingPrice,
+  };
+}
+
+function engineInputsWithSalePrices(
+  inputs: PlannerInputs | undefined,
+  salePrices: SalePriceDraft,
+): HouseTypePlannerInputs | null {
+  const saved = engineInputsFromSaved(inputs);
+  if (!saved) return null;
+  return {
+    ...saved,
+    standardReferenceSellingPrice: nullableNumber(salePrices.standard.price),
+    ecoReferenceSellingPrice: nullableNumber(salePrices.eco.price),
+    premiumReferenceSellingPrice: nullableNumber(salePrices.premium.price),
   };
 }
 
@@ -209,13 +288,18 @@ export default function PlannerPage({
   const linesQuery = useGetBudgetLines();
   const extrasQuery = useGetBudgetExtras();
   const updateInputs = useUpdatePlannerInputs();
+  const updateSalePrices = useUpdatePlannerSalePrices();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<PlannerDraft>(emptyDraft);
   const [landNote, setLandNote] = useState("");
   const [notice, setNotice] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [salePriceDrafts, setSalePriceDrafts] = useState<SalePriceDrafts>({});
+  const [salePriceNotice, setSalePriceNotice] = useState("");
+  const [salePriceSaveError, setSalePriceSaveError] = useState("");
   const [selectedHouseTypeId, setSelectedHouseTypeId] = useState("");
   const [selectedPack, setSelectedPack] = useState<PackId>("standard");
+  const hydratedHouseTypeId = useRef("");
 
   useEffect(() => {
     const houseTypes = houseTypesQuery.data;
@@ -235,19 +319,43 @@ export default function PlannerPage({
   );
 
   useEffect(() => {
+    if (!selectedHouseTypeId || inputsQuery.isLoading) return;
+    if (hydratedHouseTypeId.current === selectedHouseTypeId) return;
     setDraft(draftFromInputs(savedInputs));
     setLandNote(savedInputs?.landNote ?? "");
     setNotice("");
     setSaveError("");
-  }, [selectedHouseTypeId, savedInputs]);
+    hydratedHouseTypeId.current = selectedHouseTypeId;
+  }, [selectedHouseTypeId, inputsQuery.isLoading, savedInputs]);
+
+  useEffect(() => {
+    if (!houseTypesQuery.data || inputsQuery.isLoading) return;
+    setSalePriceDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const houseType of houseTypesQuery.data!) {
+        if (next[houseType.id]) continue;
+        next[houseType.id] = salePriceDraftFromInputs(
+          inputsQuery.data?.find(
+            (row) => row.houseTypeId === houseType.id,
+          ),
+        );
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [houseTypesQuery.data, inputsQuery.data, inputsQuery.isLoading]);
 
   const inputs = useMemo(
     () => inputsFromDraft(draft, landNote),
     [draft, landNote],
   );
+  const selectedSalePriceDraft =
+    salePriceDrafts[selectedHouseTypeId] ??
+    salePriceDraftFromInputs(savedInputs);
   const engineInputs = useMemo(
-    () => engineInputsFromUpdate(inputs),
-    [inputs],
+    () => engineInputsFromUpdate(inputs, selectedSalePriceDraft),
+    [inputs, selectedSalePriceDraft],
   );
   const packTotals = useMemo(() => {
     if (!linesQuery.data || !extrasQuery.data) return null;
@@ -298,14 +406,151 @@ export default function PlannerPage({
         id: houseType.id,
         name: houseType.name,
         costBasis: houseType.costBasis,
-        inputs: engineInputsFromSaved(
+        inputs: engineInputsWithSalePrices(
           inputsQuery.data?.find(
             (saved) => saved.houseTypeId === houseType.id,
           ),
+          salePriceDrafts[houseType.id] ??
+            salePriceDraftFromInputs(
+              inputsQuery.data?.find(
+                (saved) => saved.houseTypeId === houseType.id,
+              ),
+            ),
         ),
       })),
     );
-  }, [houseTypesQuery.data, inputsQuery.data, packTotals]);
+  }, [houseTypesQuery.data, inputsQuery.data, packTotals, salePriceDrafts]);
+
+  const salePriceMatrixRows = useMemo(() => {
+    if (!packTotals || !houseTypesQuery.data) return [];
+    return houseTypesQuery.data.map((houseType) => {
+      const saved = inputsQuery.data?.find(
+        (row) => row.houseTypeId === houseType.id,
+      );
+      const salePrices =
+        salePriceDrafts[houseType.id] ?? salePriceDraftFromInputs(saved);
+      const engineInputs = engineInputsFromSaved(saved);
+      return {
+        houseType,
+        saved,
+        salePrices,
+        metrics: {
+          standard: calculateSalePriceMetrics(
+            packTotals.standard.total,
+            engineInputs,
+            "standard",
+            nullableNumber(salePrices.standard.price),
+          ),
+          eco: calculateSalePriceMetrics(
+            packTotals.eco.total,
+            engineInputs,
+            "eco",
+            nullableNumber(salePrices.eco.price),
+          ),
+          premium: calculateSalePriceMetrics(
+            packTotals.premium.total,
+            engineInputs,
+            "premium",
+            nullableNumber(salePrices.premium.price),
+          ),
+        },
+      };
+    });
+  }, [houseTypesQuery.data, inputsQuery.data, packTotals, salePriceDrafts]);
+
+  const dirtySalePriceRows = useMemo(() => {
+    if (!houseTypesQuery.data) return [];
+    return houseTypesQuery.data.flatMap((houseType) => {
+      const saved = inputsQuery.data?.find(
+        (row) => row.houseTypeId === houseType.id,
+      );
+      const salePrices =
+        salePriceDrafts[houseType.id] ?? salePriceDraftFromInputs(saved);
+      const isDirty = packDefinitions.some(({ id }) =>
+        salePriceCellIsDirty(salePrices[id], saved, id),
+      );
+      return isDirty
+        ? [salePriceRowFromDraft(houseType.id, salePrices)]
+        : [];
+    });
+  }, [houseTypesQuery.data, inputsQuery.data, salePriceDrafts]);
+
+  const updateSalePriceDraftCell = (
+    houseTypeId: string,
+    pack: PackId,
+    field: SalePriceCellField,
+    value: string,
+  ) => {
+    const saved = inputsQuery.data?.find(
+      (row) => row.houseTypeId === houseTypeId,
+    );
+    setSalePriceDrafts((current) => {
+      const existing =
+        current[houseTypeId] ?? salePriceDraftFromInputs(saved);
+      return {
+        ...current,
+        [houseTypeId]: {
+          ...existing,
+          [pack]: { ...existing[pack], [field]: value },
+        },
+      };
+    });
+    setSalePriceNotice("");
+    setSalePriceSaveError("");
+  };
+
+  const saveSalePrices = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const invalidPrice = dirtySalePriceRows.some((row) =>
+      [
+        row.standardReferenceSellingPrice,
+        row.ecoReferenceSellingPrice,
+        row.premiumReferenceSellingPrice,
+      ].some((value) => value !== null && !Number.isFinite(value)),
+    );
+    if (invalidPrice) {
+      setSalePriceSaveError("Enter a valid number for each completed sale price.");
+      setSalePriceNotice("");
+      return;
+    }
+    if (dirtySalePriceRows.length === 0) return;
+    setSalePriceSaveError("");
+    setSalePriceNotice("");
+    updateSalePrices.mutate(
+      { data: { rows: dirtySalePriceRows } },
+      {
+        onSuccess: (savedRows) => {
+          setSalePriceDrafts((current) => {
+            const next = { ...current };
+            for (const row of savedRows) {
+              next[row.houseTypeId] = {
+                standard: {
+                  price: nullableNumberText(row.standardReferenceSellingPrice),
+                  note: nullableText(row.priceNoteStandard),
+                },
+                eco: {
+                  price: nullableNumberText(row.ecoReferenceSellingPrice),
+                  note: nullableText(row.priceNoteEco),
+                },
+                premium: {
+                  price: nullableNumberText(row.premiumReferenceSellingPrice),
+                  note: nullableText(row.priceNotePremium),
+                },
+              };
+            }
+            return next;
+          });
+          setSalePriceNotice("Sale prices and notes saved.");
+          void queryClient.invalidateQueries({
+            queryKey: getGetPlannerInputsQueryKey(),
+          });
+        },
+        onError: () => {
+          setSalePriceSaveError("Could not save the sale prices and notes.");
+        },
+      },
+    );
+  };
 
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -406,6 +651,133 @@ export default function PlannerPage({
   return (
     <div className="planner-page">
       {pageHeader}
+
+      <section
+        className="panel planner-sale-prices"
+        aria-labelledby="planner-sale-prices-heading"
+      >
+        <div className="planner-sale-prices-header">
+          <div>
+            <div className="eyebrow">SALE PRICES</div>
+            <h2 id="planner-sale-prices-heading">Sale prices</h2>
+            <p>One house unit · add a note describing the price source.</p>
+          </div>
+          <span className="pill attention"><i />ASSUMPTION</span>
+        </div>
+        <form onSubmit={saveSalePrices}>
+          <div className="planner-sale-price-table-wrap">
+            <table className="planner-sale-price-table">
+              <thead>
+                <tr>
+                  <th scope="col">House type</th>
+                  {packDefinitions.map(({ id, label }) => (
+                    <th scope="col" key={id}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {salePriceMatrixRows.map(({ houseType, saved, salePrices, metrics }) => (
+                  <tr key={houseType.id}>
+                    <th scope="row">{houseType.name}</th>
+                    {packDefinitions.map(({ id, label }) => {
+                      const cell = salePrices[id];
+                      const dirty = salePriceCellIsDirty(cell, saved, id);
+                      return (
+                        <td key={id}>
+                          <div className="planner-sale-price-cell">
+                            <label className="planner-sale-price-input-label">
+                              <span className="sr-only">
+                                {houseType.name} {label} sale price
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={cell.price}
+                                onChange={(event) =>
+                                  updateSalePriceDraftCell(
+                                    houseType.id,
+                                    id,
+                                    "price",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                            <label className="planner-sale-price-note-label">
+                              <span className="sr-only">
+                                {houseType.name} {label} price source note
+                              </span>
+                              <input
+                                type="text"
+                                placeholder="Estimate, comparable sale, offer received"
+                                value={cell.note}
+                                onChange={(event) =>
+                                  updateSalePriceDraftCell(
+                                    houseType.id,
+                                    id,
+                                    "note",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                            {dirty && <span className="planner-sale-price-unsaved">unsaved</span>}
+                            <div className="planner-sale-price-metrics">
+                              <span>
+                                ROI
+                                <strong>{formatPercent(metrics[id].roi)}</strong>
+                                {houseType.costBasis === "Twin CSV (provisional)" && (
+                                  <span className="pill attention planner-provisional-roi">
+                                    <i />PROVISIONAL
+                                  </span>
+                                )}
+                              </span>
+                              <span>
+                                Sale price / m²
+                                <strong>
+                                  {formatCurrency(
+                                    metrics[id].salePricePerSquareMeter,
+                                    currencyCode,
+                                  )}
+                                </strong>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {salePriceNotice && (
+            <div className="inline-message" role="status">
+              <Check size={15} />
+              {salePriceNotice}
+            </div>
+          )}
+          {salePriceSaveError && (
+            <div className="inline-message" role="alert">
+              <AlertCircle size={15} />
+              {salePriceSaveError}
+            </div>
+          )}
+          <div className="form-actions planner-sale-price-actions">
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={
+                updateSalePrices.isPending || dirtySalePriceRows.length === 0
+              }
+            >
+              <Save size={14} />
+              {updateSalePrices.isPending ? "Saving…" : "Save sale prices"}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <div
         className="planner-house-type-tabs"
@@ -817,6 +1189,15 @@ export default function PlannerPage({
                     <strong>{formatCurrency(pack.packTotal.total, currencyCode)}</strong>
                   </div>
                   <div className="planner-comparison-values">
+                    <div>
+                      <span>Sale price used</span>
+                      <strong>
+                        {formatCurrency(
+                          inputsForPack(engineInputs, pack.id).referenceSellingPrice,
+                          currencyCode,
+                        )}
+                      </strong>
+                    </div>
                     <div>
                       <span>Development cost</span>
                       <strong>{formatCurrency(pack.result.developmentCost, currencyCode)}</strong>
