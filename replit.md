@@ -27,18 +27,22 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-- `boxes/mapa_quantidades.csv` is the single source of truth for quantities and Eco, Standard, and Premium pricing. Show its values as supplied; do not alter or recalculate them.
-- Drive folders `boxes`, `arquitetura`, `plans`, `renders`, and `DWGs&DXF` are linked references only. Do not copy, move, rename, or write to their contents.
+- Google Drive is the source of truth. Every figure must carry a source tag (Drive file plus row/code) or be marked `ASSUMPTION` or `MANUAL`.
+- Never alter, round, or recalculate source values; show them as supplied.
+- Drive access is read-only. Never write, move, rename, or delete Drive content.
 - Keep architecture references separate from estimate tiers unless the user confirms a source-based mapping.
-- EUR is a display assumption because the master CSV has no currency field. Changing display currency changes formatting only and does not convert values.
+- The master CSV has no currency field. EUR is an `ASSUMPTION` for display only; changing display currency does not convert values.
+- Store all settings and scenarios in the database, never in the browser.
+- Keep one calculation engine in `/lib/engine`; UI, exports, and summaries must call it. Do not implement calculations elsewhere.
 
 ## Product boundaries
 
 - Keep exactly these pages: Overview, Materials map, Quotes & documents, Sources.
+- Add a Planner section only when a prompt asks for it.
 - Locked design: dark green sidebar, cream background, current fonts, and card layout. Do not restyle without the user's request.
 - Build only what the current prompt asks for. Ask when requirements are unclear or missing.
 - Before a major change, explain the plan and wait for approval.
-- After each task, list changed files and stop for the user's next instruction.
+- After each task, list changed files, confirm what was tested, and stop for the user's next instruction.
 
 ## Product
 
