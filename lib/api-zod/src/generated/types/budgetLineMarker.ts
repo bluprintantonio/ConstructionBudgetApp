@@ -14,4 +14,5 @@ export const BudgetLineMarker = {
   finishings: 'finishings',
   equipment: 'equipment',
   systems: 'systems',
+  not_applicable: 'not_applicable',
 } as const;

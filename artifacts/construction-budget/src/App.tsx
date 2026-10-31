@@ -263,7 +263,7 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <div className="page-heading fade-up"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action}</div>;
 }
 
-function MetricTile({ label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, fromExtras, pendingExtraCount, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; fromCsvLines: number; fromCommonLines: number | null; fromPremiumRatedLines: number | null; fromExtras: number; pendingExtraCount: number; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
+function MetricTile({ label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, notApplicableLineCount, notApplicableStandardValue, fromExtras, pendingExtraCount, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; fromCsvLines: number; fromCommonLines: number | null; fromPremiumRatedLines: number | null; notApplicableLineCount: number | null; notApplicableStandardValue: number | null; fromExtras: number; pendingExtraCount: number; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
   return <article className="metric-tile fade-up" style={{ animationDelay: `${index * 60}ms` }}>
     <div className="metric-top"><span className="metric-icon"><Icon size={17}/></span><span className="source-col">{sourceColumn}</span></div>
     <div className="metric-value">{currency(value, currencyCode)}</div><div className="metric-label">{label}</div>
@@ -271,6 +271,7 @@ function MetricTile({ label, value, sourceColumn, fromCsvLines, fromCommonLines,
     {fromCommonLines !== null && fromPremiumRatedLines !== null
       ? <div className="metric-label">Common lines: {currency(fromCommonLines, currencyCode)} · Premium-rated lines: {currency(fromPremiumRatedLines, currencyCode)} · Extras: {currency(fromExtras, currencyCode)}</div>
       : <div className="metric-label">From CSV lines: {currency(fromCsvLines, currencyCode)} · from extras: {currency(fromExtras, currencyCode)}</div>}
+    {notApplicableLineCount !== null && notApplicableLineCount > 0 && notApplicableStandardValue !== null && <div className="metric-label">{notApplicableLineCount} {notApplicableLineCount === 1 ? 'line' : 'lines'} not applicable in Premium · Standard value: {currency(notApplicableStandardValue, currencyCode)}</div>}
     {pendingExtraCount > 0 && <div className="metric-label">{pendingExtraCount} {pendingExtraCount === 1 ? 'extra' : 'extras'} pending a price</div>}
   </article>;
 }
@@ -464,7 +465,7 @@ function BudgetPage() {
          const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
          return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
            <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
-           <td><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={line.marker || 'common'} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems'] as BudgetLine['marker'][]).map(marker => <option key={marker} value={marker}>{titleCase(marker)}</option>)}</select></label></td>
+           <td><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={line.marker || 'common'} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(marker => <option key={marker} value={marker}>{marker === 'not_applicable' ? 'Not applicable in Premium' : titleCase(marker)}</option>)}</select></label></td>
            <td className="material-chapter">{line.category}</td>
            <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
              const quote = quotesById.get(comparison.quoteId);

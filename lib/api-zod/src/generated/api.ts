@@ -29,6 +29,8 @@ export const GetBudgetDashboardResponse = zod.object({
   "fromCsvLines": zod.number(),
   "fromCommonLines": zod.number().nullable(),
   "fromPremiumRatedLines": zod.number().nullable(),
+  "notApplicableLineCount": zod.number().int().nullable(),
+  "notApplicableStandardValue": zod.number().nullable(),
   "fromExtras": zod.number(),
   "pendingExtraCount": zod.number().int()
 })),
@@ -168,7 +170,7 @@ export const GetBudgetLinesResponseItem = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -235,7 +237,7 @@ export const CreateBudgetLineResponse = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -250,12 +252,12 @@ export const UpdateBudgetLineMarkerParams = zod.object({
 })
 
 export const UpdateBudgetLineMarkerBody = zod.object({
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems'])
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable'])
 })
 
 export const UpdateBudgetLineMarkerResponse = zod.object({
   "budgetLineCode": zod.string(),
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems'])
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable'])
 })
 
 
@@ -319,7 +321,7 @@ export const ImportBudgetLinesResponseItem = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -390,7 +392,7 @@ export const UpdateBudgetLineResponse = zod.object({
   "sourceId": zod.string().nullable(),
   "origin": zod.enum(['imported', 'manual', 'assumption']),
   "priceBasis": zod.string().nullable(),
-  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems']),
+  "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()

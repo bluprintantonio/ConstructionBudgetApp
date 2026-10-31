@@ -71,6 +71,10 @@ export interface BudgetMetric {
   fromCommonLines: number | null;
   /** @nullable */
   fromPremiumRatedLines: number | null;
+  /** @nullable */
+  notApplicableLineCount: number | null;
+  /** @nullable */
+  notApplicableStandardValue: number | null;
   fromExtras: number;
   pendingExtraCount: number;
 }
@@ -161,6 +165,7 @@ export const BudgetLineMarker = {
   finishings: 'finishings',
   equipment: 'equipment',
   systems: 'systems',
+  not_applicable: 'not_applicable',
 } as const;
 
 export interface BudgetLine {
@@ -355,6 +360,7 @@ export const LineMarkerMarker = {
   finishings: 'finishings',
   equipment: 'equipment',
   systems: 'systems',
+  not_applicable: 'not_applicable',
 } as const;
 
 export interface LineMarker {
@@ -370,6 +376,7 @@ export const LineMarkerUpdateMarker = {
   finishings: 'finishings',
   equipment: 'equipment',
   systems: 'systems',
+  not_applicable: 'not_applicable',
 } as const;
 
 export interface LineMarkerUpdate {

@@ -2,7 +2,13 @@ export type PackBudgetLine = {
   quantity: number | null;
   standardUnitPrice: number | null;
   premiumUnitPrice: number | null;
-  marker?: "common" | "finishings" | "equipment" | "systems" | null;
+  marker?:
+    | "common"
+    | "finishings"
+    | "equipment"
+    | "systems"
+    | "not_applicable"
+    | null;
 };
 
 export type PackExtra = {
@@ -17,6 +23,8 @@ export type PackCost = {
   fromCsvLines: number;
   fromCommonLines: number | null;
   fromPremiumRatedLines: number | null;
+  notApplicableLineCount: number | null;
+  notApplicableStandardValue: number | null;
   fromExtras: number;
   total: number;
   pendingExtraCount: number;
@@ -62,11 +70,15 @@ function packCost(
   extras: Pick<PackCost, "fromExtras" | "pendingExtraCount">,
   fromCommonLines: number | null = null,
   fromPremiumRatedLines: number | null = null,
+  notApplicableLineCount: number | null = null,
+  notApplicableStandardValue: number | null = null,
 ): PackCost {
   return {
     fromCsvLines,
     fromCommonLines,
     fromPremiumRatedLines,
+    notApplicableLineCount,
+    notApplicableStandardValue,
     fromExtras: extras.fromExtras,
     total: fromCsvLines + extras.fromExtras,
     pendingExtraCount: extras.pendingExtraCount,
@@ -81,14 +93,23 @@ export function calculatePackTotals(
   const premiumLines = lines.reduce(
     (totals, line) => {
       const quantity = line.quantity ?? 0;
-      if (!line.marker || line.marker === "common") {
+      if (line.marker === "not_applicable") {
+        totals.notApplicableLineCount += 1;
+        totals.notApplicableStandardValue +=
+          quantity * (line.standardUnitPrice ?? 0);
+      } else if (!line.marker || line.marker === "common") {
         totals.fromCommonLines += quantity * (line.standardUnitPrice ?? 0);
       } else {
         totals.fromPremiumRatedLines += quantity * (line.premiumUnitPrice ?? 0);
       }
       return totals;
     },
-    { fromCommonLines: 0, fromPremiumRatedLines: 0 },
+    {
+      fromCommonLines: 0,
+      fromPremiumRatedLines: 0,
+      notApplicableLineCount: 0,
+      notApplicableStandardValue: 0,
+    },
   );
   const premiumFromCsv =
     premiumLines.fromCommonLines + premiumLines.fromPremiumRatedLines;
@@ -106,6 +127,8 @@ export function calculatePackTotals(
       premiumExtras,
       premiumLines.fromCommonLines,
       premiumLines.fromPremiumRatedLines,
+      premiumLines.notApplicableLineCount,
+      premiumLines.notApplicableStandardValue,
     ),
   };
 }

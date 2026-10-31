@@ -58,6 +58,7 @@ import {
   sources,
   seedExtras,
   lineMarkerSeedRows,
+  initialLineMarkerAssignments,
   toQuoteRow,
 } from "../lib/budget-seed";
 
@@ -261,10 +262,28 @@ async function ensureSeedData(): Promise<void> {
 async function ensureLineMarkerSeedData(): Promise<void> {
   if (!lineMarkerSeedPromise) {
     lineMarkerSeedPromise = (async () => {
-      await db
-        .insert(lineMarkersTable)
-        .values(lineMarkerSeedRows)
-        .onConflictDoNothing();
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(lineMarkersTable)
+          .values(lineMarkerSeedRows)
+          .onConflictDoNothing();
+        const [newAssignmentSeed] = await tx
+          .insert(budgetMetaTable)
+          .values({ id: "line-markers-not-applicable-v1" })
+          .onConflictDoNothing()
+          .returning({ id: budgetMetaTable.id });
+        if (newAssignmentSeed) {
+          for (const assignment of initialLineMarkerAssignments) {
+            await tx
+              .insert(lineMarkersTable)
+              .values(assignment)
+              .onConflictDoUpdate({
+                target: lineMarkersTable.budgetLineCode,
+                set: { marker: assignment.marker },
+              });
+          }
+        }
+      });
     })();
   }
   await lineMarkerSeedPromise;
@@ -458,6 +477,8 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           fromCsvLines: packs.eco.fromCsvLines,
           fromCommonLines: null,
           fromPremiumRatedLines: null,
+          notApplicableLineCount: null,
+          notApplicableStandardValue: null,
           fromExtras: packs.eco.fromExtras,
           pendingExtraCount: packs.eco.pendingExtraCount,
         },
@@ -469,6 +490,8 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           fromCsvLines: packs.standard.fromCsvLines,
           fromCommonLines: null,
           fromPremiumRatedLines: null,
+          notApplicableLineCount: null,
+          notApplicableStandardValue: null,
           fromExtras: packs.standard.fromExtras,
           pendingExtraCount: packs.standard.pendingExtraCount,
         },
@@ -480,6 +503,9 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
           fromCsvLines: packs.premium.fromCsvLines,
           fromCommonLines: packs.premium.fromCommonLines,
           fromPremiumRatedLines: packs.premium.fromPremiumRatedLines,
+          notApplicableLineCount: packs.premium.notApplicableLineCount,
+          notApplicableStandardValue:
+            packs.premium.notApplicableStandardValue,
           fromExtras: packs.premium.fromExtras,
           pendingExtraCount: packs.premium.pendingExtraCount,
         },

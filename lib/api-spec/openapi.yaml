@@ -451,9 +451,11 @@ components:
         fromCsvLines: { type: number }
         fromCommonLines: { type: ["number", "null"] }
         fromPremiumRatedLines: { type: ["number", "null"] }
+        notApplicableLineCount: { type: ["integer", "null"] }
+        notApplicableStandardValue: { type: ["number", "null"] }
         fromExtras: { type: number }
         pendingExtraCount: { type: integer }
-      required: [id, label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, fromExtras, pendingExtraCount]
+      required: [id, label, value, sourceColumn, fromCsvLines, fromCommonLines, fromPremiumRatedLines, notApplicableLineCount, notApplicableStandardValue, fromExtras, pendingExtraCount]
     BudgetDashboard:
       type: object
       properties:
@@ -520,7 +522,7 @@ components:
         sourceId: { type: ["string", "null"] }
         origin: { type: string, enum: [imported, manual, assumption] }
         priceBasis: { type: ["string", "null"] }
-        marker: { type: string, enum: [common, finishings, equipment, systems] }
+        marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
         sourceUrl: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
@@ -584,12 +586,12 @@ components:
       type: object
       properties:
         budgetLineCode: { type: string }
-        marker: { type: string, enum: [common, finishings, equipment, systems] }
+        marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
       required: [budgetLineCode, marker]
     LineMarkerUpdate:
       type: object
       properties:
-        marker: { type: string, enum: [common, finishings, equipment, systems] }
+        marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
       required: [marker]
     BudgetExtra:
       type: object

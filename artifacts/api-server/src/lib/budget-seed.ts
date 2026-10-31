@@ -1,7 +1,12 @@
 import type { BudgetExtra, BudgetLine, BudgetQuote } from "@workspace/api-zod";
 import { materialMapRows } from "./material-map-data";
 
-type LineMarkerValue = "common" | "finishings" | "equipment" | "systems";
+type LineMarkerValue =
+  | "common"
+  | "finishings"
+  | "equipment"
+  | "systems"
+  | "not_applicable";
 
 const approvedLineMarkers: Record<LineMarkerValue, readonly string[]> = {
   common: [
@@ -9,11 +14,11 @@ const approvedLineMarkers: Record<LineMarkerValue, readonly string[]> = {
     "1.1", "1.2", "1.3", "1.4",
     "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
     "3.1", "3.2", "3.3",
-    "10.1", "10.2", "10.3", "10.4", "10.6",
+    "10.1", "10.2", "10.4", "10.6",
     "11.1", "11.2", "11.3",
-    "12.1", "12.2", "12.3",
+    "12.1", "12.2",
     "13.1", "13.3",
-    "14.1", "14.2", "14.3", "14.5",
+    "14.1", "14.3",
   ],
   finishings: [
     "4.1", "4.2", "4.3",
@@ -24,8 +29,19 @@ const approvedLineMarkers: Record<LineMarkerValue, readonly string[]> = {
     "15.1", "15.2", "15.3", "15.6", "15.4", "15.5",
   ],
   equipment: ["9.1", "9.2", "9.3", "9.4", "11.4", "14.6"],
-  systems: ["10.5", "13.2", "14.4"],
+  systems: ["10.5", "13.2", "14.2", "14.4", "14.5"],
+  not_applicable: ["10.3", "12.3"],
 };
+
+export const initialLineMarkerAssignments: Array<{
+  budgetLineCode: string;
+  marker: LineMarkerValue;
+}> = [
+  { budgetLineCode: "10.3", marker: "not_applicable" },
+  { budgetLineCode: "12.3", marker: "not_applicable" },
+  { budgetLineCode: "14.2", marker: "systems" },
+  { budgetLineCode: "14.5", marker: "systems" },
+];
 
 export const lineMarkerSeedRows = Object.entries(approvedLineMarkers).flatMap(
   ([marker, codes]) =>

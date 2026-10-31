@@ -16,6 +16,10 @@ export interface BudgetMetric {
   fromCommonLines: number | null;
   /** @nullable */
   fromPremiumRatedLines: number | null;
+  /** @nullable */
+  notApplicableLineCount: number | null;
+  /** @nullable */
+  notApplicableStandardValue: number | null;
   fromExtras: number;
   pendingExtraCount: number;
 }

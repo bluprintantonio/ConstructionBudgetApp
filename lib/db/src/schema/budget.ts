@@ -44,6 +44,7 @@ export const lineMarkerEnum = pgEnum("line_marker", [
   "finishings",
   "equipment",
   "systems",
+  "not_applicable",
 ]);
 
 export const budgetMetaTable = pgTable("budget_meta", {
