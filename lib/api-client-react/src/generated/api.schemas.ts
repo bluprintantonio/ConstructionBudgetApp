@@ -79,6 +79,48 @@ export interface BudgetDashboard {
   quotesNeedingReview: number;
 }
 
+export interface PlannerInputs {
+  /** @nullable */
+  grossArea: number | null;
+  /** @nullable */
+  land: number | null;
+  /** @nullable */
+  designLicensing: number | null;
+  /** @nullable */
+  managementPercent: number | null;
+  /** @nullable */
+  contingencyPercent: number | null;
+  /** @nullable */
+  targetNetMarginPercent: number | null;
+  /** @nullable */
+  salesCommissionPercent: number | null;
+  /** @nullable */
+  taxesPercent: number | null;
+  /** @nullable */
+  referenceSellingPrice: number | null;
+}
+
+export interface PlannerInputsUpdate {
+  /** @nullable */
+  grossArea: number | null;
+  /** @nullable */
+  land: number | null;
+  /** @nullable */
+  designLicensing: number | null;
+  /** @nullable */
+  managementPercent: number | null;
+  /** @nullable */
+  contingencyPercent: number | null;
+  /** @nullable */
+  targetNetMarginPercent: number | null;
+  /** @nullable */
+  salesCommissionPercent: number | null;
+  /** @nullable */
+  taxesPercent: number | null;
+  /** @nullable */
+  referenceSellingPrice: number | null;
+}
+
 export type BudgetLineStatus = typeof BudgetLineStatus[keyof typeof BudgetLineStatus];
 
 

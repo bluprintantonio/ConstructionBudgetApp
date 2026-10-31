@@ -38,6 +38,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BudgetDashboard"
+  /budget/planner-inputs:
+    get:
+      operationId: getPlannerInputs
+      tags: [budget]
+      summary: Read one-house-unit planner assumptions
+      responses:
+        "200":
+          description: Planner assumptions, blank until saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlannerInputs"
+    put:
+      operationId: updatePlannerInputs
+      tags: [budget]
+      summary: Save one-house-unit planner assumptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlannerInputsUpdate"
+      responses:
+        "200":
+          description: Saved planner assumptions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlannerInputs"
   /budget/projects:
     get:
       operationId: getBudgetProjects
@@ -364,6 +393,32 @@ components:
         linesNeedingReview: { type: integer }
         quotesNeedingReview: { type: integer }
       required: [sourceMetrics, lineCount, quoteCount, linesNeedingReview, quotesNeedingReview]
+    PlannerInputs:
+      type: object
+      properties:
+        grossArea: { type: ["number", "null"] }
+        land: { type: ["number", "null"] }
+        designLicensing: { type: ["number", "null"] }
+        managementPercent: { type: ["number", "null"] }
+        contingencyPercent: { type: ["number", "null"] }
+        targetNetMarginPercent: { type: ["number", "null"] }
+        salesCommissionPercent: { type: ["number", "null"] }
+        taxesPercent: { type: ["number", "null"] }
+        referenceSellingPrice: { type: ["number", "null"] }
+      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
+    PlannerInputsUpdate:
+      type: object
+      properties:
+        grossArea: { type: ["number", "null"] }
+        land: { type: ["number", "null"] }
+        designLicensing: { type: ["number", "null"] }
+        managementPercent: { type: ["number", "null"] }
+        contingencyPercent: { type: ["number", "null"] }
+        targetNetMarginPercent: { type: ["number", "null"] }
+        salesCommissionPercent: { type: ["number", "null"] }
+        taxesPercent: { type: ["number", "null"] }
+        referenceSellingPrice: { type: ["number", "null"] }
+      required: [grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, referenceSellingPrice]
     BudgetLine:
       type: object
       properties:

@@ -38,6 +38,50 @@ export const GetBudgetDashboardResponse = zod.object({
 
 
 /**
+ * @summary Read one-house-unit planner assumptions
+ */
+export const GetPlannerInputsResponse = zod.object({
+  "grossArea": zod.number().nullable(),
+  "land": zod.number().nullable(),
+  "designLicensing": zod.number().nullable(),
+  "managementPercent": zod.number().nullable(),
+  "contingencyPercent": zod.number().nullable(),
+  "targetNetMarginPercent": zod.number().nullable(),
+  "salesCommissionPercent": zod.number().nullable(),
+  "taxesPercent": zod.number().nullable(),
+  "referenceSellingPrice": zod.number().nullable()
+})
+
+
+/**
+ * @summary Save one-house-unit planner assumptions
+ */
+export const UpdatePlannerInputsBody = zod.object({
+  "grossArea": zod.number().nullable(),
+  "land": zod.number().nullable(),
+  "designLicensing": zod.number().nullable(),
+  "managementPercent": zod.number().nullable(),
+  "contingencyPercent": zod.number().nullable(),
+  "targetNetMarginPercent": zod.number().nullable(),
+  "salesCommissionPercent": zod.number().nullable(),
+  "taxesPercent": zod.number().nullable(),
+  "referenceSellingPrice": zod.number().nullable()
+})
+
+export const UpdatePlannerInputsResponse = zod.object({
+  "grossArea": zod.number().nullable(),
+  "land": zod.number().nullable(),
+  "designLicensing": zod.number().nullable(),
+  "managementPercent": zod.number().nullable(),
+  "contingencyPercent": zod.number().nullable(),
+  "targetNetMarginPercent": zod.number().nullable(),
+  "salesCommissionPercent": zod.number().nullable(),
+  "taxesPercent": zod.number().nullable(),
+  "referenceSellingPrice": zod.number().nullable()
+})
+
+
+/**
  * @summary List building types
  */
 export const GetBudgetProjectsResponseItem = zod.object({

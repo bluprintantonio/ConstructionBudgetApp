@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./packs": "./packs/index.ts"
+    "./packs": "./packs/index.ts",
+    "./planner": "./planner/index.ts"
   },
   "scripts": {
-    "test": "node --test tests/packs.test.mjs"
+    "test": "node --test tests/*.test.mjs"
   }
 }

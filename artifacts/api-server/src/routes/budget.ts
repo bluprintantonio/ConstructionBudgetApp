@@ -8,6 +8,7 @@ import {
   budgetMetaTable,
   budgetQuotesTable,
   extrasTable,
+  plannerInputsTable,
   sourcesTable,
 } from "@workspace/db";
 import {
@@ -25,8 +26,11 @@ import {
   GetBudgetProjectsResponse,
   GetBudgetQuotesResponse,
   GetBudgetSourcesResponse,
+  GetPlannerInputsResponse,
   ImportBudgetLinesBody,
   ImportBudgetLinesResponse,
+  UpdatePlannerInputsBody,
+  UpdatePlannerInputsResponse,
   UpdateBudgetLineBody,
   UpdateBudgetLineParams,
   UpdateBudgetLineResponse,
@@ -51,6 +55,18 @@ const router: IRouter = Router();
 const connectors = new ReplitConnectors();
 let seedPromise: Promise<void> | undefined;
 let extrasSeedPromise: Promise<void> | undefined;
+const PLANNER_INPUTS_ID = "one-house-unit";
+const EMPTY_PLANNER_INPUTS = {
+  grossArea: null,
+  land: null,
+  designLicensing: null,
+  managementPercent: null,
+  contingencyPercent: null,
+  targetNetMarginPercent: null,
+  salesCommissionPercent: null,
+  taxesPercent: null,
+  referenceSellingPrice: null,
+};
 
 type DriveFileMetadata = {
   name?: string;
@@ -422,6 +438,60 @@ router.get("/budget/dashboard", async (_req, res): Promise<void> => {
         .length,
       quotesNeedingReview: quotes.filter((quote) => quote.status === "needs_review")
         .length,
+    }),
+  );
+});
+
+router.get("/budget/planner-inputs", async (_req, res): Promise<void> => {
+  const [row] = await db
+    .select()
+    .from(plannerInputsTable)
+    .where(eq(plannerInputsTable.id, PLANNER_INPUTS_ID))
+    .limit(1);
+  res.json(
+    GetPlannerInputsResponse.parse(
+      row
+        ? {
+            grossArea: row.grossArea,
+            land: row.land,
+            designLicensing: row.designLicensing,
+            managementPercent: row.managementPercent,
+            contingencyPercent: row.contingencyPercent,
+            targetNetMarginPercent: row.targetNetMarginPercent,
+            salesCommissionPercent: row.salesCommissionPercent,
+            taxesPercent: row.taxesPercent,
+            referenceSellingPrice: row.referenceSellingPrice,
+          }
+        : EMPTY_PLANNER_INPUTS,
+    ),
+  );
+});
+
+router.put("/budget/planner-inputs", async (req, res): Promise<void> => {
+  const parsed = UpdatePlannerInputsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [row] = await db
+    .insert(plannerInputsTable)
+    .values({ id: PLANNER_INPUTS_ID, ...parsed.data })
+    .onConflictDoUpdate({
+      target: plannerInputsTable.id,
+      set: parsed.data,
+    })
+    .returning();
+  res.json(
+    UpdatePlannerInputsResponse.parse({
+      grossArea: row.grossArea,
+      land: row.land,
+      designLicensing: row.designLicensing,
+      managementPercent: row.managementPercent,
+      contingencyPercent: row.contingencyPercent,
+      targetNetMarginPercent: row.targetNetMarginPercent,
+      salesCommissionPercent: row.salesCommissionPercent,
+      taxesPercent: row.taxesPercent,
+      referenceSellingPrice: row.referenceSellingPrice,
     }),
   );
 });

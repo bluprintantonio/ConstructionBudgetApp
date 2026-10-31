@@ -119,3 +119,16 @@ export const extrasTable = pgTable("extras", {
   quoteId: text("quote_id").references(() => budgetQuotesTable.id),
   notes: text("notes"),
 });
+
+export const plannerInputsTable = pgTable("planner_inputs", {
+  id: text("id").primaryKey(),
+  grossArea: real("gross_area"),
+  land: real("land"),
+  designLicensing: real("design_licensing"),
+  managementPercent: real("management_percent"),
+  contingencyPercent: real("contingency_percent"),
+  targetNetMarginPercent: real("target_net_margin_percent"),
+  salesCommissionPercent: real("sales_commission_percent"),
+  taxesPercent: real("taxes_percent"),
+  referenceSellingPrice: real("reference_selling_price"),
+});

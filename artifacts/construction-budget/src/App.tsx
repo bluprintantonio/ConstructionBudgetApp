@@ -21,6 +21,7 @@ import {
   getGetBudgetQuotesQueryKey
 } from '@workspace/api-client-react';
 import { calculatePackTotals } from '@workspace/engine/packs';
+import PlannerPage from './pages/planner';
 
 const queryClient = new QueryClient();
 const quoteStatuses = Object.values(BudgetQuoteStatus);
@@ -28,6 +29,7 @@ const documentTypes = Object.values(BudgetQuoteDocumentType);
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/budget', label: 'Materials map', icon: ClipboardList },
+  { href: '/planner', label: 'Planner', icon: Landmark },
   { href: '/quotes', label: 'Quotes & documents', icon: FileCheck2 },
   { href: '/sources', label: 'Sources', icon: Link2 },
 ];
@@ -526,7 +528,11 @@ function NotFound() {
   return <div className="not-found"><div className="eyebrow">404 / NOT IN THE PLANS</div><h1>This page isn’t<br/><em>on the drawing.</em></h1><p>The address may have changed or the page may no longer exist.</p><Link href="/" className="button button-primary"><ArrowLeft size={15}/> Back to overview</Link></div>;
 }
 function Router() {
-  return <Switch><Route path="/" component={() => <Shell><Overview/></Shell>}/><Route path="/budget" component={() => <Shell><BudgetPage/></Shell>}/><Route path="/quotes" component={() => <Shell><QuotesPage/></Shell>}/><Route path="/sources" component={() => <Shell><SourcesPage/></Shell>}/><Route component={() => <Shell><NotFound/></Shell>}/></Switch>;
+  return <Switch><Route path="/" component={() => <Shell><Overview/></Shell>}/><Route path="/budget" component={() => <Shell><BudgetPage/></Shell>}/><Route path="/planner" component={PlannerRoute}/><Route path="/quotes" component={() => <Shell><QuotesPage/></Shell>}/><Route path="/sources" component={() => <Shell><SourcesPage/></Shell>}/><Route component={() => <Shell><NotFound/></Shell>}/></Switch>;
+}
+function PlannerRoute() {
+  const { currencyCode } = useCurrency();
+  return <Shell><PlannerPage currencyCode={currencyCode}/></Shell>;
 }
 function App() {
   return <CurrencyProvider><QueryClientProvider client={queryClient}><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router/></WouterRouter></QueryClientProvider></CurrencyProvider>;
