@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
-import { asc, eq, like } from "drizzle-orm";
+import { asc, eq, isNotNull, like } from "drizzle-orm";
 import {
   db,
   budgetLinesTable,
   budgetMetaTable,
   budgetQuotesTable,
+  sourcesTable,
 } from "@workspace/db";
 import {
   CreateBudgetLineBody,
@@ -31,6 +32,7 @@ import {
   buildingTypes,
   seedMaterials,
   seedQuotes,
+  sourceSeedRows,
   sources,
   toQuoteRow,
 } from "../lib/budget-seed";
@@ -41,6 +43,24 @@ let seedPromise: Promise<void> | undefined;
 async function ensureSeedData(): Promise<void> {
   if (!seedPromise) {
     seedPromise = (async () => {
+      const [sourcesSeedMarker] = await db
+        .select({ id: budgetMetaTable.id })
+        .from(budgetMetaTable)
+        .where(eq(budgetMetaTable.id, "sources-v1"))
+        .limit(1);
+      if (!sourcesSeedMarker) {
+        await db.transaction(async (tx) => {
+          await tx
+            .insert(sourcesTable)
+            .values(sourceSeedRows)
+            .onConflictDoNothing();
+          await tx
+            .insert(budgetMetaTable)
+            .values({ id: "sources-v1" })
+            .onConflictDoNothing();
+        });
+      }
+
       const [quoteSeedMarker] = await db
         .select({ id: budgetMetaTable.id })
         .from(budgetMetaTable)
@@ -79,17 +99,57 @@ async function ensureSeedData(): Promise<void> {
             .onConflictDoNothing();
         });
       }
+
+      const [provenanceSeedMarker] = await db
+        .select({ id: budgetMetaTable.id })
+        .from(budgetMetaTable)
+        .where(eq(budgetMetaTable.id, "budget-line-provenance-v1"))
+        .limit(1);
+      if (!provenanceSeedMarker) {
+        await db.transaction(async (tx) => {
+          await tx
+            .update(budgetLinesTable)
+            .set({ sourceId: "materials-master", origin: "imported" })
+            .where(isNotNull(budgetLinesTable.sourceRow));
+          await tx
+            .insert(budgetMetaTable)
+            .values({ id: "budget-line-provenance-v1" })
+            .onConflictDoNothing();
+        });
+      }
     })();
   }
   await seedPromise;
 }
 
-function serializeLine(line: typeof budgetLinesTable.$inferSelect) {
+function serializeLine(
+  line: typeof budgetLinesTable.$inferSelect,
+  sourceUrl: string | null,
+) {
   return {
     ...line,
+    sourceUrl,
     createdAt: line.createdAt.toISOString(),
     updatedAt: line.updatedAt.toISOString(),
   };
+}
+
+async function serializeLines(
+  lines: (typeof budgetLinesTable.$inferSelect)[],
+) {
+  const sourceRows = await db
+    .select({ id: sourcesTable.id, driveUrl: sourcesTable.driveUrl })
+    .from(sourcesTable);
+  const sourceUrls = new Map(
+    sourceRows.map((source) => [source.id, source.driveUrl]),
+  );
+
+  return lines.map((line) =>
+    serializeLine(
+      line,
+      line.sourceId ? (sourceUrls.get(line.sourceId) ?? null) : null,
+    ),
+  );
 }
 
 function serializeQuote(quote: typeof budgetQuotesTable.$inferSelect) {
@@ -123,6 +183,9 @@ function lineValues(
     reviewStatus: data.reviewStatus,
     sourceRow: data.sourceRow ?? null,
     sourceNote: data.sourceNote ?? null,
+    sourceId: null,
+    origin: "manual",
+    priceBasis: null,
     code: data.code ?? null,
     unit: data.unit ?? null,
     quantity: data.quantity ?? null,
@@ -204,7 +267,7 @@ router.get("/budget/lines", async (_req, res): Promise<void> => {
     .select()
     .from(budgetLinesTable)
     .orderBy(asc(budgetLinesTable.category), asc(budgetLinesTable.item));
-  res.json(GetBudgetLinesResponse.parse(lines.map(serializeLine)));
+  res.json(GetBudgetLinesResponse.parse(await serializeLines(lines)));
 });
 
 router.post("/budget/lines", async (req, res): Promise<void> => {
@@ -231,7 +294,8 @@ router.post("/budget/lines", async (req, res): Promise<void> => {
     .insert(budgetLinesTable)
     .values(values)
     .returning();
-  res.status(201).json(CreateBudgetLineResponse.parse(serializeLine(line)));
+  const [serializedLine] = await serializeLines([line]);
+  res.status(201).json(CreateBudgetLineResponse.parse(serializedLine));
 });
 
 router.post("/budget/lines/import", async (req, res): Promise<void> => {
@@ -263,7 +327,7 @@ router.post("/budget/lines/import", async (req, res): Promise<void> => {
   });
   res
     .status(201)
-    .json(ImportBudgetLinesResponse.parse(lines.map(serializeLine)));
+    .json(ImportBudgetLinesResponse.parse(await serializeLines(lines)));
 });
 
 router.patch("/budget/lines/:lineId", async (req, res): Promise<void> => {
@@ -295,7 +359,8 @@ router.patch("/budget/lines/:lineId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Budget line not found." });
     return;
   }
-  res.json(UpdateBudgetLineResponse.parse(serializeLine(line)));
+  const [serializedLine] = await serializeLines([line]);
+  res.json(UpdateBudgetLineResponse.parse(serializedLine));
 });
 
 router.delete("/budget/lines/:lineId", async (req, res): Promise<void> => {

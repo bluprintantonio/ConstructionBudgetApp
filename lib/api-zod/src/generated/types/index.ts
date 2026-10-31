@@ -12,6 +12,7 @@ export * from './budgetLineImport';
 export * from './budgetLineInput';
 export * from './budgetLineInputReviewStatus';
 export * from './budgetLineInputStatus';
+export * from './budgetLineOrigin';
 export * from './budgetLineReviewStatus';
 export * from './budgetLineStatus';
 export * from './budgetLineUpdate';

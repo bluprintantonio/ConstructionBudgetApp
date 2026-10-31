@@ -66,6 +66,15 @@ export const BudgetLineReviewStatus = {
   confirmed: 'confirmed',
 } as const;
 
+export type BudgetLineOrigin = typeof BudgetLineOrigin[keyof typeof BudgetLineOrigin];
+
+
+export const BudgetLineOrigin = {
+  imported: 'imported',
+  manual: 'manual',
+  assumption: 'assumption',
+} as const;
+
 export interface BudgetLine {
   id: string;
   /** @nullable */
@@ -108,6 +117,13 @@ export interface BudgetLine {
   sourceRow: number | null;
   /** @nullable */
   sourceNote: string | null;
+  /** @nullable */
+  sourceId: string | null;
+  origin: BudgetLineOrigin;
+  /** @nullable */
+  priceBasis: string | null;
+  /** @nullable */
+  sourceUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,10 +1,36 @@
-import { pgTable, real, text, timestamp, integer } from "drizzle-orm/pg-core";
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  real,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+export const sourceTypeEnum = pgEnum("source_type", ["csv", "folder"]);
+export const budgetLineOriginEnum = pgEnum("budget_line_origin", [
+  "imported",
+  "manual",
+  "assumption",
+]);
 
 export const budgetMetaTable = pgTable("budget_meta", {
   id: text("id").primaryKey(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+export const sourcesTable = pgTable("sources", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  type: sourceTypeEnum("type").notNull(),
+  driveFileId: text("drive_file_id").notNull(),
+  driveUrl: text("drive_url").notNull(),
+  driveModifiedTime: timestamp("drive_modified_time", { withTimezone: true }),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  status: text("status"),
 });
 
 export const budgetLinesTable = pgTable("budget_lines", {
@@ -31,6 +57,9 @@ export const budgetLinesTable = pgTable("budget_lines", {
   reviewStatus: text("review_status").notNull().default("unreviewed"),
   sourceRow: integer("source_row"),
   sourceNote: text("source_note"),
+  sourceId: text("source_id").references(() => sourcesTable.id),
+  origin: budgetLineOriginEnum("origin").notNull().default("manual"),
+  priceBasis: text("price_basis"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

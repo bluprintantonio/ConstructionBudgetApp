@@ -85,6 +85,10 @@ export const GetBudgetLinesResponseItem = zod.object({
   "reviewStatus": zod.enum(['unreviewed', 'confirmed']),
   "sourceRow": zod.number().int().nullable(),
   "sourceNote": zod.string().nullable(),
+  "sourceId": zod.string().nullable(),
+  "origin": zod.enum(['imported', 'manual', 'assumption']),
+  "priceBasis": zod.string().nullable(),
+  "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -147,6 +151,10 @@ export const CreateBudgetLineResponse = zod.object({
   "reviewStatus": zod.enum(['unreviewed', 'confirmed']),
   "sourceRow": zod.number().int().nullable(),
   "sourceNote": zod.string().nullable(),
+  "sourceId": zod.string().nullable(),
+  "origin": zod.enum(['imported', 'manual', 'assumption']),
+  "priceBasis": zod.string().nullable(),
+  "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -209,6 +217,10 @@ export const ImportBudgetLinesResponseItem = zod.object({
   "reviewStatus": zod.enum(['unreviewed', 'confirmed']),
   "sourceRow": zod.number().int().nullable(),
   "sourceNote": zod.string().nullable(),
+  "sourceId": zod.string().nullable(),
+  "origin": zod.enum(['imported', 'manual', 'assumption']),
+  "priceBasis": zod.string().nullable(),
+  "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -275,6 +287,10 @@ export const UpdateBudgetLineResponse = zod.object({
   "reviewStatus": zod.enum(['unreviewed', 'confirmed']),
   "sourceRow": zod.number().int().nullable(),
   "sourceNote": zod.string().nullable(),
+  "sourceId": zod.string().nullable(),
+  "origin": zod.enum(['imported', 'manual', 'assumption']),
+  "priceBasis": zod.string().nullable(),
+  "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })

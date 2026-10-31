@@ -300,9 +300,13 @@ components:
         reviewStatus: { type: string, enum: [unreviewed, confirmed] }
         sourceRow: { type: ["integer", "null"] }
         sourceNote: { type: ["string", "null"] }
+        sourceId: { type: ["string", "null"] }
+        origin: { type: string, enum: [imported, manual, assumption] }
+        priceBasis: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, code, category, item, unit, quantity, standardUnitPrice, standardTotal, ecoUnitPrice, ecoTotal, premiumUnitPrice, premiumTotal, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, createdAt, updatedAt]
+      required: [id, code, category, item, unit, quantity, standardUnitPrice, standardTotal, ecoUnitPrice, ecoTotal, premiumUnitPrice, premiumTotal, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, sourceId, origin, priceBasis, sourceUrl, createdAt, updatedAt]
     BudgetLineInput:
       type: object
       properties:

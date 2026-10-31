@@ -46,6 +46,27 @@ export const sources = [
   },
 ] as const;
 
+export const sourceSeedRows = sources.map((source) => {
+  const driveFileId = source.url.match(
+    /\/(?:file\/d|drive\/folders)\/([^/?]+)/,
+  )?.[1];
+  if (!driveFileId) {
+    throw new Error(`Could not extract a Drive ID for source "${source.id}".`);
+  }
+
+  return {
+    id: source.id,
+    name: source.name,
+    description: source.note,
+    type: source.sourceType === "spreadsheet" ? ("csv" as const) : ("folder" as const),
+    driveFileId,
+    driveUrl: source.url,
+    driveModifiedTime: null,
+    lastCheckedAt: null,
+    status: null,
+  };
+});
+
 export const buildingTypes = [
   {
     id: "bungalow",
@@ -67,7 +88,10 @@ export const buildingTypes = [
   },
 ] as const;
 
-type BudgetLineSeed = Omit<BudgetLine, "createdAt" | "updatedAt">;
+type BudgetLineSeed = Omit<
+  BudgetLine,
+  "createdAt" | "updatedAt" | "sourceUrl"
+>;
 
 export const seedMaterials: BudgetLineSeed[] = materialMapRows.map(
   (row, index) => ({
@@ -94,6 +118,9 @@ export const seedMaterials: BudgetLineSeed[] = materialMapRows.map(
     reviewStatus: "confirmed",
     sourceRow: index + 2,
     sourceNote: "Imported from boxes/mapa_quantidades.csv; source values preserved.",
+    sourceId: "materials-master",
+    origin: "imported",
+    priceBasis: null,
   }),
 );
 
