@@ -338,6 +338,58 @@ export const DeleteBudgetLineResponse = zod.void()
 
 
 /**
+ * @summary List pack extras
+ */
+export const GetBudgetExtrasResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "inEco": zod.boolean(),
+  "inPremium": zod.boolean(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "unitPrice": zod.number().nullable(),
+  "priceStatus": zod.enum(['estimate', 'quoted', 'pending']),
+  "quoteId": zod.string().nullable(),
+  "notes": zod.string().nullable()
+})
+export const GetBudgetExtrasResponse = zod.array(GetBudgetExtrasResponseItem)
+
+
+/**
+ * @summary Update a pack extra
+ */
+export const UpdateBudgetExtraParams = zod.object({
+  "extraId": zod.coerce.string()
+})
+
+export const updateBudgetExtraBodyQuantityMin = 0;
+
+export const updateBudgetExtraBodyUnitPriceMin = 0;
+
+
+
+export const UpdateBudgetExtraBody = zod.object({
+  "quantity": zod.number().int().min(updateBudgetExtraBodyQuantityMin).optional(),
+  "unitPrice": zod.number().min(updateBudgetExtraBodyUnitPriceMin).nullish(),
+  "priceStatus": zod.enum(['estimate', 'quoted', 'pending']).optional(),
+  "notes": zod.string().nullish()
+})
+
+export const UpdateBudgetExtraResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "inEco": zod.boolean(),
+  "inPremium": zod.boolean(),
+  "quantity": zod.number().int(),
+  "unit": zod.string(),
+  "unitPrice": zod.number().nullable(),
+  "priceStatus": zod.enum(['estimate', 'quoted', 'pending']),
+  "quoteId": zod.string().nullable(),
+  "notes": zod.string().nullable()
+})
+
+
+/**
  * @summary List supplier quotes and source documents
  */
 export const GetBudgetQuotesResponseItem = zod.object({

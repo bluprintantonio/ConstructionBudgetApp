@@ -1,5 +1,68 @@
-import type { BudgetLine, BudgetQuote } from "@workspace/api-zod";
+import type { BudgetExtra, BudgetLine, BudgetQuote } from "@workspace/api-zod";
 import { materialMapRows } from "./material-map-data";
+
+export const seedExtras = [
+  {
+    id: "solar-panels",
+    name: "Solar panels",
+    inEco: true,
+    inPremium: true,
+    quantity: 1,
+    unit: "un",
+    unitPrice: null,
+    priceStatus: "pending",
+    quoteId: null,
+    notes: null,
+  },
+  {
+    id: "heat-pump",
+    name: "Heat pump",
+    inEco: false,
+    inPremium: true,
+    quantity: 1,
+    unit: "un",
+    unitPrice: null,
+    priceStatus: "pending",
+    quoteId: null,
+    notes: null,
+  },
+  {
+    id: "ev-charging",
+    name: "EV charging",
+    inEco: false,
+    inPremium: true,
+    quantity: 1,
+    unit: "un",
+    unitPrice: null,
+    priceStatus: "pending",
+    quoteId: null,
+    notes: null,
+  },
+  {
+    id: "pergola",
+    name: "Pergola",
+    inEco: false,
+    inPremium: true,
+    quantity: 1,
+    unit: "un",
+    unitPrice: null,
+    priceStatus: "pending",
+    quoteId: null,
+    notes: null,
+  },
+  {
+    id: "home-automation",
+    name: "Home automation",
+    inEco: false,
+    inPremium: true,
+    quantity: 1,
+    unit: "un",
+    unitPrice: null,
+    priceStatus: "pending",
+    quoteId: null,
+    notes: null,
+  },
+] satisfies BudgetExtra[];
 
 export const sources = [
   {

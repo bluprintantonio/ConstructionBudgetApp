@@ -9,13 +9,15 @@ import {
   X, AlertCircle, Pencil, Landmark
 } from 'lucide-react';
 import {
-  BudgetLine, BudgetQuote, BudgetLineInput, BudgetQuoteInput,
+  BudgetExtra, BudgetExtraUpdate, BudgetLine, BudgetQuote, BudgetLineInput, BudgetQuoteInput,
   BudgetQuoteStatus, BudgetQuoteDocumentType,
   useHealthCheck, useGetBudgetDashboard, useGetBudgetProjects, useGetBudgetSources,
   useCheckBudgetSourceConnection,
+  useGetBudgetExtras, useUpdateBudgetExtra,
   useGetBudgetLines, useGetBudgetQuotes, useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
   useDeleteBudgetQuote, getGetBudgetDashboardQueryKey, getGetBudgetLinesQueryKey,
+  getGetBudgetExtrasQueryKey,
   getGetBudgetQuotesQueryKey
 } from '@workspace/api-client-react';
 
@@ -294,15 +296,60 @@ function FormActions({ onCancel, pending, label }: { onCancel: () => void; pendi
   return <div className="form-actions"><button type="button" className="button button-secondary" onClick={onCancel}>Cancel</button><button className="button button-primary" type="submit" disabled={pending}>{pending ? 'Saving…' : <>{label}<ArrowRight size={15}/></>}</button></div>;
 }
 
+type ExtraDraft = {
+  quantity: string;
+  unitPrice: string;
+  priceStatus: BudgetExtra['priceStatus'];
+  notes: string;
+};
+
+function extraDraftFrom(extra: BudgetExtra): ExtraDraft {
+  return {
+    quantity: String(extra.quantity),
+    unitPrice: extra.unitPrice == null ? '' : String(extra.unitPrice),
+    priceStatus: extra.priceStatus,
+    notes: extra.notes ?? '',
+  };
+}
+
 function BudgetPage() {
   const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
+  const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
   const { currencyCode } = useCurrency();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
   const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
+  const [extraDrafts, setExtraDrafts] = useState<Record<string, ExtraDraft>>({});
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
   const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
   const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
   const reload = () => { void query.refetch(); void dashboard.refetch(); };
+  const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
+  const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
+    ...current,
+    [extra.id]: { ...(current[extra.id] ?? extraDraftFrom(extra)), ...patch },
+  }));
+  const saveExtra = (extra: BudgetExtra) => {
+    const draft = draftForExtra(extra);
+    const quantity = Number(draft.quantity);
+    const priceText = draft.unitPrice.trim();
+    const unitPrice = priceText ? Number(priceText) : null;
+    if (!Number.isInteger(quantity) || quantity < 0) { setMessage('Extra quantity must be a whole number of 0 or more.'); return; }
+    if (unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0)) { setMessage('Enter a valid non-negative unit price, or leave it blank.'); return; }
+    const payload: BudgetExtraUpdate = {
+      quantity,
+      unitPrice,
+      priceStatus: draft.priceStatus,
+      notes: draft.notes.trim() || null,
+    };
+    updateExtra.mutate({ extraId: extra.id, data: payload }, {
+      onSuccess: () => {
+        setExtraDrafts(current => { const next = { ...current }; delete next[extra.id]; return next; });
+        setMessage(`${extra.name} saved.`);
+        void client.invalidateQueries({ queryKey: getGetBudgetExtrasQueryKey() });
+      },
+      onError: () => setMessage(`Could not save ${extra.name}.`),
+    });
+  };
   const save = (e: FormEvent<HTMLFormElement>, line?: BudgetLine) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
     const text = (key: string) => String(fd.get(key) || '').trim();
@@ -333,6 +380,25 @@ function BudgetPage() {
       {!filtered.length && <tr><td colSpan={9}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
       </tbody></table></div>
       <div className="table-footer"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
+    </section>
+    <section className="panel register-panel">
+      <div className="register-toolbar"><strong>Extras</strong><span className="source-ref">Unit price is the total for one complete item.</span></div>
+      {extrasQuery.isLoading ? <div className="table-footer">Loading extras…</div> : extrasQuery.isError ? <div className="inline-message"><AlertCircle size={15}/>Could not load extras.<button className="text-link" onClick={() => void extrasQuery.refetch()}>Retry</button></div> : <div className="table-scroll scrollbar-thin"><table className="data-table">
+        <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th/></tr></thead>
+        <tbody>{(extrasQuery.data || []).map(extra => {
+          const draft = draftForExtra(extra);
+          return <tr key={extra.id} data-testid={`row-extra-${extra.id}`}>
+            <td><strong data-testid={`text-extra-name-${extra.id}`}>{extra.name}</strong></td>
+            <td><div className="row-actions">{extra.inEco && <span className="pill" data-testid={`flag-extra-eco-${extra.id}`}><i/>Eco</span>}{extra.inPremium && <span className="pill" data-testid={`flag-extra-premium-${extra.id}`}><i/>Premium</span>}</div></td>
+            <td><label className="form-field"><input aria-label={`${extra.name} quantity`} data-testid={`input-extra-quantity-${extra.id}`} type="number" min="0" step="1" value={draft.quantity} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { quantity: event.target.value })}/></label></td>
+            <td data-testid={`text-extra-unit-${extra.id}`}>{extra.unit}</td>
+            <td><label className="form-field"><input aria-label={`${extra.name} complete item price`} data-testid={`input-extra-unit-price-${extra.id}`} type="number" min="0" step="0.01" placeholder="—" value={draft.unitPrice} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { unitPrice: event.target.value })}/></label>{extra.unitPrice == null && !draft.unitPrice.trim() && <small className="source-ref" data-testid={`status-extra-price-pending-${extra.id}`}>Price pending</small>}</td>
+            <td><label className="form-field"><select aria-label={`${extra.name} price status`} data-testid={`select-extra-status-${extra.id}`} value={draft.priceStatus} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { priceStatus: event.target.value as BudgetExtra['priceStatus'] })}>{(['estimate', 'quoted', 'pending'] as BudgetExtra['priceStatus'][]).map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></label></td>
+            <td><label className="form-field"><input aria-label={`${extra.name} notes`} data-testid={`input-extra-notes-${extra.id}`} value={draft.notes} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { notes: event.target.value })}/></label></td>
+            <td><button className="button button-secondary" data-testid={`button-save-extra-${extra.id}`} disabled={updateExtra.isPending} onClick={() => saveExtra(extra)}>Save</button></td>
+          </tr>;
+        })}</tbody>
+      </table></div>}
     </section>
     <div className="data-footnote"><CircleHelp size={14}/> The CSV has no currency field; amounts are formatted in the selected display currency without conversion. A source value of 0 is preserved and is not interpreted as a free item.</div>
     <Dialog open={createOpen || !!editing} title={editing ? 'Edit material' : 'Add material'} subtitle="Keep the source code, quantities, and three scenarios together." onClose={() => { setCreateOpen(false); setEditing(null); }}>

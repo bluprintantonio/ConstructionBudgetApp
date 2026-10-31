@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgEnum,
   pgTable,
@@ -19,6 +20,11 @@ export const budgetLineOriginEnum = pgEnum("budget_line_origin", [
   "imported",
   "manual",
   "assumption",
+]);
+export const extraPriceStatusEnum = pgEnum("extra_price_status", [
+  "estimate",
+  "quoted",
+  "pending",
 ]);
 
 export const budgetMetaTable = pgTable("budget_meta", {
@@ -98,4 +104,17 @@ export const budgetQuotesTable = pgTable("budget_quotes", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+});
+
+export const extrasTable = pgTable("extras", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  inEco: boolean("in_eco").notNull(),
+  inPremium: boolean("in_premium").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unit: text("unit").notNull(),
+  unitPrice: real("unit_price"),
+  priceStatus: extraPriceStatusEnum("price_status").notNull().default("pending"),
+  quoteId: text("quote_id").references(() => budgetQuotesTable.id),
+  notes: text("notes"),
 });

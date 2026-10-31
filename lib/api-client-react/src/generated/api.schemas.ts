@@ -287,6 +287,53 @@ export interface BudgetLineUpdate {
 
 export type BudgetLineImport = BudgetLineInput[];
 
+export type BudgetExtraPriceStatus = typeof BudgetExtraPriceStatus[keyof typeof BudgetExtraPriceStatus];
+
+
+export const BudgetExtraPriceStatus = {
+  estimate: 'estimate',
+  quoted: 'quoted',
+  pending: 'pending',
+} as const;
+
+export interface BudgetExtra {
+  id: string;
+  name: string;
+  inEco: boolean;
+  inPremium: boolean;
+  quantity: number;
+  unit: string;
+  /** @nullable */
+  unitPrice: number | null;
+  priceStatus: BudgetExtraPriceStatus;
+  /** @nullable */
+  quoteId: string | null;
+  /** @nullable */
+  notes: string | null;
+}
+
+export type BudgetExtraUpdatePriceStatus = typeof BudgetExtraUpdatePriceStatus[keyof typeof BudgetExtraUpdatePriceStatus];
+
+
+export const BudgetExtraUpdatePriceStatus = {
+  estimate: 'estimate',
+  quoted: 'quoted',
+  pending: 'pending',
+} as const;
+
+export interface BudgetExtraUpdate {
+  /** @minimum 0 */
+  quantity?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  unitPrice?: number | null;
+  priceStatus?: BudgetExtraUpdatePriceStatus;
+  /** @nullable */
+  notes?: string | null;
+}
+
 export type BudgetQuoteDocumentType = typeof BudgetQuoteDocumentType[keyof typeof BudgetQuoteDocumentType];
 
 

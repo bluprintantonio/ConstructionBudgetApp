@@ -6,6 +6,7 @@ import {
   budgetLinesTable,
   budgetMetaTable,
   budgetQuotesTable,
+  extrasTable,
   sourcesTable,
 } from "@workspace/db";
 import {
@@ -18,6 +19,7 @@ import {
   DeleteBudgetLineParams,
   DeleteBudgetQuoteParams,
   GetBudgetDashboardResponse,
+  GetBudgetExtrasResponse,
   GetBudgetLinesResponse,
   GetBudgetProjectsResponse,
   GetBudgetQuotesResponse,
@@ -27,6 +29,9 @@ import {
   UpdateBudgetLineBody,
   UpdateBudgetLineParams,
   UpdateBudgetLineResponse,
+  UpdateBudgetExtraBody,
+  UpdateBudgetExtraParams,
+  UpdateBudgetExtraResponse,
   UpdateBudgetQuoteBody,
   UpdateBudgetQuoteParams,
   UpdateBudgetQuoteResponse,
@@ -37,12 +42,14 @@ import {
   seedQuotes,
   sourceSeedRows,
   sources,
+  seedExtras,
   toQuoteRow,
 } from "../lib/budget-seed";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
 let seedPromise: Promise<void> | undefined;
+let extrasSeedPromise: Promise<void> | undefined;
 
 type DriveFileMetadata = {
   name?: string;
@@ -220,6 +227,28 @@ async function ensureSeedData(): Promise<void> {
     })();
   }
   await seedPromise;
+}
+
+async function ensureExtrasSeedData(): Promise<void> {
+  if (!extrasSeedPromise) {
+    extrasSeedPromise = (async () => {
+      const [seedMarker] = await db
+        .select({ id: budgetMetaTable.id })
+        .from(budgetMetaTable)
+        .where(eq(budgetMetaTable.id, "pack-extras-v1"))
+        .limit(1);
+      if (!seedMarker) {
+        await db.transaction(async (tx) => {
+          await tx.insert(extrasTable).values(seedExtras).onConflictDoNothing();
+          await tx
+            .insert(budgetMetaTable)
+            .values({ id: "pack-extras-v1" })
+            .onConflictDoNothing();
+        });
+      }
+    })();
+  }
+  await extrasSeedPromise;
 }
 
 function serializeLine(
@@ -465,6 +494,46 @@ router.get("/budget/lines", async (_req, res): Promise<void> => {
     .orderBy(asc(budgetLinesTable.category), asc(budgetLinesTable.item));
   res.json(GetBudgetLinesResponse.parse(await serializeLines(lines)));
 });
+
+router.get("/budget/extras", async (_req, res): Promise<void> => {
+  await ensureExtrasSeedData();
+  const extras = await db.select().from(extrasTable);
+  const order = new Map(seedExtras.map((extra, index) => [extra.id, index]));
+  extras.sort(
+    (first, second) =>
+      (order.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(second.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  res.json(GetBudgetExtrasResponse.parse(extras));
+});
+
+router.patch(
+  "/budget/extras/:extraId",
+  async (req, res): Promise<void> => {
+    await ensureExtrasSeedData();
+    const params = UpdateBudgetExtraParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const parsed = UpdateBudgetExtraBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const [updated] = await db
+      .update(extrasTable)
+      .set(parsed.data)
+      .where(eq(extrasTable.id, params.data.extraId))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "Pack extra not found." });
+      return;
+    }
+    res.json(UpdateBudgetExtraResponse.parse(updated));
+  },
+);
 
 router.post("/budget/lines", async (req, res): Promise<void> => {
   await ensureSeedData();

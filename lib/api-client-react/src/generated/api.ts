@@ -26,6 +26,8 @@ import type {
 
 import type {
   BudgetDashboard,
+  BudgetExtra,
+  BudgetExtraUpdate,
   BudgetLine,
   BudgetLineImport,
   BudgetLineInput,
@@ -983,6 +985,196 @@ export const useDeleteBudgetLine = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteBudgetLineMutationOptions(options), queryClient);
+    }
+
+export const getGetBudgetExtrasUrl = () => {
+
+
+
+
+  return `/api/budget/extras`
+}
+
+/**
+ * @summary List pack extras
+ */
+export const getBudgetExtras = async ( options?: Parameters<typeof customFetch>[1]): Promise<BudgetExtra[]> => {
+
+  return customFetch<BudgetExtra[]>(getGetBudgetExtrasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBudgetExtrasQueryKey = () => {
+    return [
+    `/api/budget/extras`
+    ] as const;
+    }
+
+
+export const getGetBudgetExtrasQueryOptions = <TData = Awaited<ReturnType<typeof getBudgetExtras>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBudgetExtrasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBudgetExtras>>> = ({ signal }) => getBudgetExtras({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetBudgetExtrasQueryResult = NonNullable<Awaited<ReturnType<typeof getBudgetExtras>>>
+export type GetBudgetExtrasQueryError = ErrorType<unknown>
+
+
+export function useGetBudgetExtras<TData = Awaited<ReturnType<typeof getBudgetExtras>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBudgetExtras>>,
+          TError,
+          Awaited<ReturnType<typeof getBudgetExtras>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBudgetExtras<TData = Awaited<ReturnType<typeof getBudgetExtras>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBudgetExtras>>,
+          TError,
+          Awaited<ReturnType<typeof getBudgetExtras>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBudgetExtras<TData = Awaited<ReturnType<typeof getBudgetExtras>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List pack extras
+ */
+
+export function useGetBudgetExtras<TData = Awaited<ReturnType<typeof getBudgetExtras>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBudgetExtras>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetBudgetExtrasQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateBudgetExtraUrl = (extraId: string,) => {
+
+
+
+
+  return `/api/budget/extras/${extraId}`
+}
+
+/**
+ * @summary Update a pack extra
+ */
+export const updateBudgetExtra = async (extraId: string,
+    budgetExtraUpdate: BudgetExtraUpdate, options?: Parameters<typeof customFetch>[1]): Promise<BudgetExtra> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BudgetExtra>(getUpdateBudgetExtraUrl(extraId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(budgetExtraUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateBudgetExtraMutationKey = () => ['updateBudgetExtra'] as const;
+
+export const getUpdateBudgetExtraMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBudgetExtra>>, TError,UpdateBudgetExtraMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBudgetExtra>>, TError,UpdateBudgetExtraMutationVariables, TContext> => {
+
+const mutationKey = getUpdateBudgetExtraMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBudgetExtra>>, UpdateBudgetExtraMutationVariables> = (props) => {
+          const {extraId,data} = props ?? {};
+
+          return  updateBudgetExtra(extraId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBudgetExtraMutationResult = NonNullable<Awaited<ReturnType<typeof updateBudgetExtra>>>
+    export type UpdateBudgetExtraMutationBody = BodyType<BudgetExtraUpdate>
+    export type UpdateBudgetExtraMutationError = ErrorType<void>
+    export type UpdateBudgetExtraMutationVariables = {extraId: string;data: BodyType<BudgetExtraUpdate>}
+
+    /**
+ * @summary Update a pack extra
+ */
+export const useUpdateBudgetExtra = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBudgetExtra>>, TError,UpdateBudgetExtraMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateBudgetExtra>>,
+        TError,
+        UpdateBudgetExtraMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateBudgetExtraMutationOptions(options), queryClient);
     }
 
 export const getGetBudgetQuotesUrl = () => {

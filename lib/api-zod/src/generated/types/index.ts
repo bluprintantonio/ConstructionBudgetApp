@@ -7,6 +7,10 @@
  */
 
 export * from './budgetDashboard';
+export * from './budgetExtra';
+export * from './budgetExtraPriceStatus';
+export * from './budgetExtraUpdate';
+export * from './budgetExtraUpdatePriceStatus';
 export * from './budgetLine';
 export * from './budgetLineImport';
 export * from './budgetLineInput';
