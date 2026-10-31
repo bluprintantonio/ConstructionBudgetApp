@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: budget
+    description: Construction budget data and source references
 paths:
   /healthz:
     get:
@@ -24,6 +26,210 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /budget/dashboard:
+    get:
+      operationId: getBudgetDashboard
+      tags: [budget]
+      summary: Get budget dashboard summary
+      responses:
+        "200":
+          description: Budget dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetDashboard"
+  /budget/projects:
+    get:
+      operationId: getBudgetProjects
+      tags: [budget]
+      summary: List building types
+      responses:
+        "200":
+          description: Building types represented in architecture sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetProject"
+  /budget/sources:
+    get:
+      operationId: getBudgetSources
+      tags: [budget]
+      summary: List linked source folders and files
+      responses:
+        "200":
+          description: Read-only links to source material
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetSource"
+  /budget/lines:
+    get:
+      operationId: getBudgetLines
+      tags: [budget]
+      summary: List budget lines
+      responses:
+        "200":
+          description: Budget lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetLine"
+    post:
+      operationId: createBudgetLine
+      tags: [budget]
+      summary: Create a budget line
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLineInput"
+      responses:
+        "201":
+          description: Created budget line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetLine"
+  /budget/lines/import:
+    post:
+      operationId: importBudgetLines
+      tags: [budget]
+      summary: Import budget lines
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLineImport"
+      responses:
+        "201":
+          description: Imported budget lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetLine"
+  /budget/lines/{lineId}:
+    patch:
+      operationId: updateBudgetLine
+      tags: [budget]
+      summary: Update a budget line
+      parameters:
+        - name: lineId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetLineUpdate"
+      responses:
+        "200":
+          description: Updated budget line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetLine"
+        "404":
+          description: Budget line not found
+    delete:
+      operationId: deleteBudgetLine
+      tags: [budget]
+      summary: Delete a budget line
+      parameters:
+        - name: lineId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Budget line deleted
+        "404":
+          description: Budget line not found
+  /budget/quotes:
+    get:
+      operationId: getBudgetQuotes
+      tags: [budget]
+      summary: List supplier quotes and source documents
+      responses:
+        "200":
+          description: Quotes and categorized source documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetQuote"
+    post:
+      operationId: createBudgetQuote
+      tags: [budget]
+      summary: Add a supplier quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetQuoteInput"
+      responses:
+        "201":
+          description: Created quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetQuote"
+  /budget/quotes/{quoteId}:
+    patch:
+      operationId: updateBudgetQuote
+      tags: [budget]
+      summary: Update a supplier quote
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetQuoteUpdate"
+      responses:
+        "200":
+          description: Updated quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetQuote"
+        "404":
+          description: Quote not found
+    delete:
+      operationId: deleteBudgetQuote
+      tags: [budget]
+      summary: Delete a quote
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Quote deleted
+        "404":
+          description: Quote not found
 components:
   schemas:
     HealthStatus:
@@ -33,4 +239,143 @@ components:
           type: string
       required:
         - status
+    BudgetProject:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sourceUrl: { type: string }
+      required: [id, name, sourceUrl]
+    BudgetSource:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sourceType: { type: string, enum: [spreadsheet, folder, plan] }
+        url: { type: string }
+        note: { type: string }
+      required: [id, name, sourceType, url, note]
+    BudgetMetric:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        value: { type: number }
+        sourceColumn: { type: string }
+      required: [id, label, value, sourceColumn]
+    BudgetDashboard:
+      type: object
+      properties:
+        sourceMetrics:
+          type: array
+          items: { $ref: "#/components/schemas/BudgetMetric" }
+        lineCount: { type: integer }
+        quoteCount: { type: integer }
+        linesNeedingReview: { type: integer }
+        quotesNeedingReview: { type: integer }
+      required: [sourceMetrics, lineCount, quoteCount, linesNeedingReview, quotesNeedingReview]
+    BudgetLine:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        item: { type: string }
+        buildingType: { type: ["string", "null"] }
+        vendor: { type: ["string", "null"] }
+        receitas: { type: ["number", "null"] }
+        balanco: { type: ["number", "null"] }
+        investimento: { type: ["number", "null"] }
+        despesas: { type: ["number", "null"] }
+        quoteAmount: { type: ["number", "null"] }
+        status: { type: string, enum: [planned, quoted, committed, paid, needs_review] }
+        reviewStatus: { type: string, enum: [unreviewed, confirmed] }
+        sourceRow: { type: ["integer", "null"] }
+        sourceNote: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required: [id, category, item, buildingType, vendor, receitas, balanco, investimento, despesas, quoteAmount, status, reviewStatus, sourceRow, sourceNote, createdAt, updatedAt]
+    BudgetLineInput:
+      type: object
+      properties:
+        category: { type: string, minLength: 1 }
+        item: { type: string, minLength: 1 }
+        buildingType: { type: ["string", "null"] }
+        vendor: { type: ["string", "null"] }
+        receitas: { type: ["number", "null"] }
+        balanco: { type: ["number", "null"] }
+        investimento: { type: ["number", "null"] }
+        despesas: { type: ["number", "null"] }
+        quoteAmount: { type: ["number", "null"] }
+        status: { type: string, enum: [planned, quoted, committed, paid, needs_review] }
+        reviewStatus: { type: string, enum: [unreviewed, confirmed] }
+        sourceRow: { type: ["integer", "null"] }
+        sourceNote: { type: ["string", "null"] }
+      required: [category, item, status, reviewStatus]
+    BudgetLineUpdate:
+      type: object
+      properties:
+        category: { type: string, minLength: 1 }
+        item: { type: string, minLength: 1 }
+        buildingType: { type: ["string", "null"] }
+        vendor: { type: ["string", "null"] }
+        receitas: { type: ["number", "null"] }
+        balanco: { type: ["number", "null"] }
+        investimento: { type: ["number", "null"] }
+        despesas: { type: ["number", "null"] }
+        quoteAmount: { type: ["number", "null"] }
+        status: { type: string, enum: [planned, quoted, committed, paid, needs_review] }
+        reviewStatus: { type: string, enum: [unreviewed, confirmed] }
+        sourceRow: { type: ["integer", "null"] }
+        sourceNote: { type: ["string", "null"] }
+    BudgetLineImport:
+      type: array
+      items:
+        $ref: "#/components/schemas/BudgetLineInput"
+    BudgetQuote:
+      type: object
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        category: { type: string }
+        vendor: { type: ["string", "null"] }
+        documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
+        status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
+        amount: { type: ["number", "null"] }
+        buildingType: { type: ["string", "null"] }
+        modifiedAt: { type: ["string", "null"] }
+        sourceUrl: { type: string }
+        sourceFolderUrl: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required: [id, fileName, category, vendor, documentType, status, amount, buildingType, modifiedAt, sourceUrl, sourceFolderUrl, note, createdAt, updatedAt]
+    BudgetQuoteInput:
+      type: object
+      properties:
+        fileName: { type: string, minLength: 1 }
+        category: { type: string, minLength: 1 }
+        vendor: { type: ["string", "null"] }
+        documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
+        status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
+        amount: { type: ["number", "null"] }
+        buildingType: { type: ["string", "null"] }
+        modifiedAt: { type: ["string", "null"] }
+        sourceUrl: { type: string, minLength: 1 }
+        sourceFolderUrl: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
+      required: [fileName, category, documentType, status, sourceUrl]
+    BudgetQuoteUpdate:
+      type: object
+      properties:
+        fileName: { type: string, minLength: 1 }
+        category: { type: string, minLength: 1 }
+        vendor: { type: ["string", "null"] }
+        documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
+        status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
+        amount: { type: ["number", "null"] }
+        buildingType: { type: ["string", "null"] }
+        modifiedAt: { type: ["string", "null"] }
+        sourceUrl: { type: string, minLength: 1 }
+        sourceFolderUrl: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
 

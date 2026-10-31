@@ -1,0 +1,1 @@
+- [Generated client typings](generated-client-typings.md) — Keep Orval's React Query major and TypeScript DOM libraries aligned with installed packages.

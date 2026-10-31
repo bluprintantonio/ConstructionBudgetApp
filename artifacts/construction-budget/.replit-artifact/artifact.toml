@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Construction Budget"
+description = "A private construction budgeting app that organizes trade budgets, vendor quotes, and project plans into a traceable, editable view of project costs."
+version = "1.0.0"
+id = "artifacts/construction-budget"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19386
+
+[services.development]
+run = "pnpm --filter @workspace/construction-budget run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/construction-budget", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/construction-budget/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19386"
+BASE_PATH = "/"

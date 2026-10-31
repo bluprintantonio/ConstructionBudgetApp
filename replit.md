@@ -1,10 +1,11 @@
-# [Project name]
+# Construction Budget
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A construction budget workspace that connects source-sheet entries, supplier documents, and building references.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server
+- `pnpm --filter @workspace/construction-budget run dev` — run the construction budget app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -26,11 +27,15 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Keep the source sheet's `receitas`, `balanço`, `investimento`, and `despesas` fields distinct; do not interpret them as budget, actual, or variance without confirmation.
+- Drive records are seeded as editable app data with links back to their source files. The initial build does not write to Drive or extract prices from PDFs.
+- EUR is the default display assumption; changing the display currency changes formatting only and does not convert values.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Review the source-sheet figures and budget lines.
+- Organize supplier documents by trade, status, and building reference.
+- Edit records, import/export budget-line CSV, and open the linked Drive sources.
 
 ## User preferences
 
@@ -38,7 +43,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Imported figures and proposal prices are marked for review; confirm their meaning and amount against the original source.
 
 ## Pointers
 
