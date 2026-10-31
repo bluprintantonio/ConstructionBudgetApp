@@ -1,4 +1,6 @@
 import app from "./app";
+import { and, isNotNull, isNull, sql } from "drizzle-orm";
+import { budgetQuotesTable, db } from "@workspace/db";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -15,11 +17,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
+async function startServer(): Promise<void> {
+  await db
+    .update(budgetQuotesTable)
+    .set({ driveUrl: sql`${budgetQuotesTable.sourceUrl}` })
+    .where(
+      and(
+        isNull(budgetQuotesTable.driveUrl),
+        isNotNull(budgetQuotesTable.sourceUrl),
+      ),
+    );
 
-  logger.info({ port }, "Server listening");
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+
+    logger.info({ port }, "Server listening");
+  });
+}
+
+void startServer().catch((err: unknown) => {
+  logger.error({ err }, "Error preparing database before server startup");
+  process.exit(1);
 });
