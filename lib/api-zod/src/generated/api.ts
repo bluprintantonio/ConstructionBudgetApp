@@ -49,8 +49,7 @@ export const GetPlannerInputsResponse = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable(),
-  "premiumAdjustmentPct": zod.number().int().nullable()
+  "referenceSellingPrice": zod.number().nullable()
 })
 
 
@@ -66,8 +65,7 @@ export const UpdatePlannerInputsBody = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable(),
-  "premiumAdjustmentPct": zod.number().int().nullable()
+  "referenceSellingPrice": zod.number().nullable()
 })
 
 export const UpdatePlannerInputsResponse = zod.object({
@@ -79,8 +77,7 @@ export const UpdatePlannerInputsResponse = zod.object({
   "targetNetMarginPercent": zod.number().nullable(),
   "salesCommissionPercent": zod.number().nullable(),
   "taxesPercent": zod.number().nullable(),
-  "referenceSellingPrice": zod.number().nullable(),
-  "premiumAdjustmentPct": zod.number().int().nullable()
+  "referenceSellingPrice": zod.number().nullable()
 })
 
 

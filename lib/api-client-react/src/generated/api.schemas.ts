@@ -98,8 +98,6 @@ export interface PlannerInputs {
   taxesPercent: number | null;
   /** @nullable */
   referenceSellingPrice: number | null;
-  /** @nullable */
-  premiumAdjustmentPct: number | null;
 }
 
 export interface PlannerInputsUpdate {
@@ -121,8 +119,6 @@ export interface PlannerInputsUpdate {
   taxesPercent: number | null;
   /** @nullable */
   referenceSellingPrice: number | null;
-  /** @nullable */
-  premiumAdjustmentPct: number | null;
 }
 
 export type BudgetLineStatus = typeof BudgetLineStatus[keyof typeof BudgetLineStatus];
