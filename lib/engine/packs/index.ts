@@ -2,6 +2,9 @@ export type PackBudgetLine = {
   quantity: number | null;
   standardUnitPrice: number | null;
   premiumUnitPrice: number | null;
+  code?: string | null;
+  item?: string | null;
+  description?: string | null;
   marker?:
     | "common"
     | "finishings"
@@ -34,6 +37,23 @@ export type PackTotals = {
   standard: PackCost;
   eco: PackCost;
   premium: PackCost;
+  premiumReconciliation: PremiumReconciliation;
+};
+
+export type PremiumReconciliationLine = {
+  code: string | null;
+  description: string;
+  quantity: number;
+  standardUnitPrice: number;
+  premiumUnitPrice: number;
+  difference: number;
+};
+
+export type PremiumReconciliation = {
+  csvPremiumTotal: number;
+  commonUpliftRemoved: number;
+  premiumLinesUsedByApp: number;
+  commonUpliftLines: PremiumReconciliationLine[];
 };
 
 function csvLinesTotal(
@@ -113,6 +133,32 @@ export function calculatePackTotals(
   );
   const premiumFromCsv =
     premiumLines.fromCommonLines + premiumLines.fromPremiumRatedLines;
+  const commonUpliftLines = lines.flatMap((line) => {
+    if (line.marker && line.marker !== "common") return [];
+    const standardUnitPrice = line.standardUnitPrice ?? 0;
+    const premiumUnitPrice = line.premiumUnitPrice ?? 0;
+    if (premiumUnitPrice <= standardUnitPrice) return [];
+    const quantity = line.quantity ?? 0;
+    return [
+      {
+        code: line.code ?? null,
+        description: line.description ?? line.item ?? "",
+        quantity,
+        standardUnitPrice,
+        premiumUnitPrice,
+        difference: quantity * (premiumUnitPrice - standardUnitPrice),
+      },
+    ];
+  });
+  commonUpliftLines.sort(
+    (left, right) =>
+      right.difference - left.difference ||
+      (left.code ?? "").localeCompare(right.code ?? ""),
+  );
+  const commonUpliftRemoved = commonUpliftLines.reduce(
+    (total, line) => total + line.difference,
+    0,
+  );
   const ecoExtras = extraCosts(extras, (extra) => extra.inEco);
   const premiumExtras = extraCosts(extras, (extra) => extra.inPremium);
 
@@ -130,5 +176,11 @@ export function calculatePackTotals(
       premiumLines.notApplicableLineCount,
       premiumLines.notApplicableStandardValue,
     ),
+    premiumReconciliation: {
+      csvPremiumTotal: csvLinesTotal(lines, "premiumUnitPrice"),
+      commonUpliftRemoved,
+      premiumLinesUsedByApp: premiumFromCsv,
+      commonUpliftLines,
+    },
   };
 }

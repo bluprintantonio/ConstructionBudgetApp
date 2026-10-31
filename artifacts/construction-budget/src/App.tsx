@@ -375,6 +375,10 @@ function BudgetPage() {
   const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
   const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
   const packMetrics = dashboard.data?.sourceMetrics || [];
+  const premiumReconciliation = useMemo(
+    () => calculatePackTotals(lines, []).premiumReconciliation,
+    [lines],
+  );
   const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); };
   const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
   const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
@@ -456,6 +460,25 @@ function BudgetPage() {
      <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
      <div className="data-footnote"><SlidersHorizontal size={14}/> Changing a marker changes the Premium total. Lines without a saved marker count as Common.</div>
      {packMetrics.length > 0 && <><div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2>Pack totals</h2></div></div><div className="metrics-grid">{packMetrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div></>}
+     {lines.length > 0 && <section className="panel register-panel">
+       <div className="register-toolbar"><div><div className="eyebrow">PREMIUM RECONCILIATION</div><h2>CSV Premium to app Premium lines</h2></div></div>
+       <div className="register-strip">
+         <div className="register-stat"><strong>{currency(premiumReconciliation.csvPremiumTotal, currencyCode)}</strong><span>CSV Premium total (all lines at their CSV Premium price)</span></div>
+         <div className="register-stat"><strong>−{currency(premiumReconciliation.commonUpliftRemoved, currencyCode)}</strong><span>Premium uplift removed on Common lines (Premium price &gt; Standard price)</span></div>
+         <div className="register-stat"><strong>{currency(premiumReconciliation.premiumLinesUsedByApp, currencyCode)}</strong><span>Premium lines used by the app (plus extras)</span></div>
+       </div>
+       <div className="table-scroll scrollbar-thin"><table className="data-table budget-table">
+         <thead><tr><th>CODE</th><th>DESCRIPTION</th><th>QTY</th><th>STANDARD PRICE</th><th>PREMIUM PRICE</th><th>DIFFERENCE</th></tr></thead>
+         <tbody>{premiumReconciliation.commonUpliftLines.map((line, index) => <tr key={line.code || `${line.description}-${index}`}>
+           <td><span className="material-code">{line.code || '—'}</span></td>
+           <td>{line.description}</td>
+           <td className="money-cell">{line.quantity}</td>
+           <td className="money-cell">{currency(line.standardUnitPrice, currencyCode)}</td>
+           <td className="money-cell">{currency(line.premiumUnitPrice, currencyCode)}</td>
+           <td className="money-cell">{currency(line.difference, currencyCode)}</td>
+         </tr>)}</tbody>
+       </table></div>
+     </section>}
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
      {(quotesQuery.isError || quoteLinksQuery.isError) && <div className="inline-message"><AlertCircle size={15}/>Quote comparisons could not be loaded. Refresh to try again.</div>}
     <section className="panel register-panel">
