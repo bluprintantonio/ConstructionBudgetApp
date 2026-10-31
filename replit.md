@@ -1,6 +1,6 @@
-# Construction Budget
+# FieldNotes
 
-A construction budget workspace that connects source-sheet entries, supplier documents, and building references.
+A home renovation tracker that connects the master quantity map, supplier documents, and architecture references.
 
 ## Run & Operate
 
@@ -27,16 +27,24 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-- Use `boxes/mapa_quantidades.csv` as the master material and estimate source. Keep its Eco, Standard, and Premium scenarios separate.
-- Keep architectural references in `arquitetura` separate from estimate tiers; do not map them without source evidence.
-- Drive records are seeded as editable app data with links back to their source files. The initial build does not write to Drive or extract prices from PDFs.
+- `boxes/mapa_quantidades.csv` is the single source of truth for quantities and Eco, Standard, and Premium pricing. Show its values as supplied; do not alter or recalculate them.
+- Drive folders `boxes`, `arquitetura`, `plans`, `renders`, and `DWGs&DXF` are linked references only. Do not copy, move, rename, or write to their contents.
+- Keep architecture references separate from estimate tiers unless the user confirms a source-based mapping.
 - EUR is a display assumption because the master CSV has no currency field. Changing display currency changes formatting only and does not convert values.
+
+## Product boundaries
+
+- Keep exactly these pages: Overview, Materials map, Quotes & documents, Sources.
+- Locked design: dark green sidebar, cream background, current fonts, and card layout. Do not restyle without the user's request.
+- Build only what the current prompt asks for. Ask when requirements are unclear or missing.
+- Before a major change, explain the plan and wait for approval.
+- After each task, list changed files and stop for the user's next instruction.
 
 ## Product
 
-- Review coded materials, quantities, and three estimate scenarios.
+- Review coded materials, quantities, and three estimate scenarios as supplied by the master CSV.
 - Organize supplier documents by trade, status, and building reference.
-- Edit materials, import/export the master CSV, and open linked Drive sources.
+- Open linked Drive sources without changing them.
 
 ## User preferences
 
