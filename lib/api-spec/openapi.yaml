@@ -304,6 +304,50 @@ paths:
                 $ref: "#/components/schemas/BudgetQuote"
         "404":
           description: Quote not found
+  /budget/quote-links:
+    get:
+      operationId: getBudgetQuoteLinks
+      tags: [budget]
+      summary: List quote links to budget lines and extras
+      responses:
+        "200":
+          description: Quote links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetQuoteLink"
+  /budget/quotes/{quoteId}/links:
+    put:
+      operationId: updateBudgetQuoteLinks
+      tags: [budget]
+      summary: Replace a quote's linked budget lines and extras
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetQuoteLinksUpdate"
+      responses:
+        "200":
+          description: Updated quote links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BudgetQuoteLink"
+        "404":
+          description: Quote not found
+        "400":
+          description: Invalid quote link target
     delete:
       operationId: deleteBudgetQuote
       tags: [budget]
@@ -528,6 +572,7 @@ components:
         quantity: { type: integer, minimum: 0 }
         unitPrice: { type: ["number", "null"], minimum: 0 }
         priceStatus: { type: string, enum: [estimate, quoted, pending] }
+        quoteId: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
     BudgetQuote:
       type: object
@@ -539,6 +584,11 @@ components:
         documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
         status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
         amount: { type: ["number", "null"] }
+        priceScope: { type: string, default: "per house unit" }
+        scopeType: { type: string, enum: [supplied, installed, unknown] }
+        vatIncluded: { type: string, enum: [yes, no, unknown] }
+        validityDate: { type: ["string", "null"] }
+        driveUrl: { type: ["string", "null"], format: uri }
         buildingType: { type: ["string", "null"] }
         modifiedAt: { type: ["string", "null"] }
         sourceUrl: { type: string }
@@ -546,7 +596,7 @@ components:
         note: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, fileName, category, vendor, documentType, status, amount, buildingType, modifiedAt, sourceUrl, sourceFolderUrl, note, createdAt, updatedAt]
+      required: [id, fileName, category, vendor, documentType, status, amount, priceScope, scopeType, vatIncluded, validityDate, driveUrl, buildingType, modifiedAt, sourceUrl, sourceFolderUrl, note, createdAt, updatedAt]
     BudgetQuoteInput:
       type: object
       properties:
@@ -556,6 +606,11 @@ components:
         documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
         status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
         amount: { type: ["number", "null"] }
+        priceScope: { type: string, default: "per house unit" }
+        scopeType: { type: string, enum: [supplied, installed, unknown] }
+        vatIncluded: { type: string, enum: [yes, no, unknown] }
+        validityDate: { type: ["string", "null"] }
+        driveUrl: { type: ["string", "null"], format: uri }
         buildingType: { type: ["string", "null"] }
         modifiedAt: { type: ["string", "null"] }
         sourceUrl: { type: string, minLength: 1 }
@@ -571,9 +626,36 @@ components:
         documentType: { type: string, enum: [proposal, estimate, specification, comparison, unknown] }
         status: { type: string, enum: [needs_review, quoted, accepted, rejected] }
         amount: { type: ["number", "null"] }
+        priceScope: { type: string }
+        scopeType: { type: string, enum: [supplied, installed, unknown] }
+        vatIncluded: { type: string, enum: [yes, no, unknown] }
+        validityDate: { type: ["string", "null"] }
+        driveUrl: { type: ["string", "null"], format: uri }
         buildingType: { type: ["string", "null"] }
         modifiedAt: { type: ["string", "null"] }
         sourceUrl: { type: string, minLength: 1 }
         sourceFolderUrl: { type: ["string", "null"] }
         note: { type: ["string", "null"] }
+    BudgetQuoteLink:
+      type: object
+      properties:
+        id: { type: string }
+        quoteId: { type: string }
+        budgetLineCode: { type: ["string", "null"] }
+        extraId: { type: ["string", "null"] }
+      required: [id, quoteId, budgetLineCode, extraId]
+    BudgetQuoteLinkTarget:
+      type: object
+      properties:
+        budgetLineCode: { type: ["string", "null"] }
+        extraId: { type: ["string", "null"] }
+      required: [budgetLineCode, extraId]
+    BudgetQuoteLinksUpdate:
+      type: object
+      properties:
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetQuoteLinkTarget"
+      required: [links]
 

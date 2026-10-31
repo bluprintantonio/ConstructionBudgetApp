@@ -8,5 +8,5 @@
     "rootDir": ".",
     "types": []
   },
-  "include": ["packs/**/*.ts", "planner/**/*.ts"]
+  "include": ["packs/**/*.ts", "planner/**/*.ts", "quotes/**/*.ts"]
 }

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { asc, eq, isNotNull, like } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { calculatePackTotals } from "@workspace/engine/packs";
 import {
@@ -9,6 +9,7 @@ import {
   budgetQuotesTable,
   extrasTable,
   plannerInputsTable,
+  quoteLinksTable,
   sourcesTable,
 } from "@workspace/db";
 import {
@@ -24,6 +25,7 @@ import {
   GetBudgetExtrasResponse,
   GetBudgetLinesResponse,
   GetBudgetProjectsResponse,
+  GetBudgetQuoteLinksResponse,
   GetBudgetQuotesResponse,
   GetBudgetSourcesResponse,
   GetPlannerInputsResponse,
@@ -37,6 +39,9 @@ import {
   UpdateBudgetExtraBody,
   UpdateBudgetExtraParams,
   UpdateBudgetExtraResponse,
+  UpdateBudgetQuoteLinksBody,
+  UpdateBudgetQuoteLinksParams,
+  UpdateBudgetQuoteLinksResponse,
   UpdateBudgetQuoteBody,
   UpdateBudgetQuoteParams,
   UpdateBudgetQuoteResponse,
@@ -385,6 +390,11 @@ function quoteValues(
     documentType: data.documentType,
     status: data.status,
     amount: data.amount ?? null,
+    priceScope: data.priceScope ?? "per house unit",
+    scopeType: data.scopeType ?? "unknown",
+    vatIncluded: data.vatIncluded ?? "unknown",
+    validityDate: data.validityDate ?? null,
+    driveUrl: data.driveUrl ?? null,
     buildingType: data.buildingType ?? null,
     modifiedAt: data.modifiedAt ? new Date(data.modifiedAt) : null,
     sourceUrl: data.sourceUrl,
@@ -606,6 +616,34 @@ router.patch(
       return;
     }
 
+    if (parsed.data.quoteId != null) {
+      const [linkedQuote] = await db
+        .select({ amount: budgetQuotesTable.amount })
+        .from(quoteLinksTable)
+        .innerJoin(
+          budgetQuotesTable,
+          eq(quoteLinksTable.quoteId, budgetQuotesTable.id),
+        )
+        .where(
+          and(
+            eq(quoteLinksTable.quoteId, parsed.data.quoteId),
+            eq(quoteLinksTable.extraId, params.data.extraId),
+          ),
+        )
+        .limit(1);
+      if (
+        !linkedQuote ||
+        linkedQuote.amount == null ||
+        parsed.data.unitPrice !== linkedQuote.amount ||
+        parsed.data.priceStatus !== "quoted"
+      ) {
+        res.status(400).json({
+          error: "Use a linked quote with an entered amount to set this extra price.",
+        });
+        return;
+      }
+    }
+
     const [updated] = await db
       .update(extrasTable)
       .set(parsed.data)
@@ -738,6 +776,120 @@ router.get("/budget/quotes", async (_req, res): Promise<void> => {
     .orderBy(asc(budgetQuotesTable.category), asc(budgetQuotesTable.fileName));
   res.json(GetBudgetQuotesResponse.parse(quotes.map(serializeQuote)));
 });
+
+router.get("/budget/quote-links", async (_req, res): Promise<void> => {
+  const links = await db
+    .select()
+    .from(quoteLinksTable)
+    .orderBy(asc(quoteLinksTable.quoteId), asc(quoteLinksTable.id));
+  res.json(GetBudgetQuoteLinksResponse.parse(links));
+});
+
+router.put(
+  "/budget/quotes/:quoteId/links",
+  async (req, res): Promise<void> => {
+    const params = UpdateBudgetQuoteLinksParams.safeParse(req.params);
+    const parsed = UpdateBudgetQuoteLinksBody.safeParse(req.body);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const [quote] = await db
+      .select({ id: budgetQuotesTable.id })
+      .from(budgetQuotesTable)
+      .where(eq(budgetQuotesTable.id, params.data.quoteId))
+      .limit(1);
+    if (!quote) {
+      res.status(404).json({ error: "Quote not found." });
+      return;
+    }
+
+    const invalidTarget = parsed.data.links.some(
+      (link) =>
+        (link.budgetLineCode !== null) === (link.extraId !== null) ||
+        (link.budgetLineCode !== null && link.budgetLineCode.trim() === "") ||
+        (link.extraId !== null && link.extraId.trim() === ""),
+    );
+    if (invalidTarget) {
+      res.status(400).json({
+        error: "Each quote link must target exactly one budget line or extra.",
+      });
+      return;
+    }
+
+    const lineCodes = parsed.data.links
+      .map((link) => link.budgetLineCode)
+      .filter((code): code is string => code !== null);
+    const extraIds = parsed.data.links
+      .map((link) => link.extraId)
+      .filter((id): id is string => id !== null);
+    const [existingLines, existingExtras] = await Promise.all([
+      lineCodes.length
+        ? db
+            .select({ code: budgetLinesTable.code })
+            .from(budgetLinesTable)
+            .where(inArray(budgetLinesTable.code, lineCodes))
+        : Promise.resolve([]),
+      extraIds.length
+        ? db
+            .select({ id: extrasTable.id })
+            .from(extrasTable)
+            .where(inArray(extrasTable.id, extraIds))
+        : Promise.resolve([]),
+    ]);
+    const knownLineCodes = new Set(existingLines.map((line) => line.code));
+    const knownExtraIds = new Set(existingExtras.map((extra) => extra.id));
+    if (
+      lineCodes.some((code) => !knownLineCodes.has(code)) ||
+      extraIds.some((id) => !knownExtraIds.has(id))
+    ) {
+      res.status(400).json({
+        error: "A linked budget line code or extra does not exist.",
+      });
+      return;
+    }
+
+    const duplicateTargets = new Set<string>();
+    for (const link of parsed.data.links) {
+      const key =
+        link.budgetLineCode !== null
+          ? `line:${link.budgetLineCode}`
+          : `extra:${link.extraId}`;
+      if (duplicateTargets.has(key)) {
+        res.status(400).json({ error: "Duplicate quote link target." });
+        return;
+      }
+      duplicateTargets.add(key);
+    }
+
+    const links = await db.transaction(async (tx) => {
+      await tx
+        .delete(quoteLinksTable)
+        .where(eq(quoteLinksTable.quoteId, params.data.quoteId));
+      if (parsed.data.links.length > 0) {
+        await tx.insert(quoteLinksTable).values(
+          parsed.data.links.map((link) => ({
+            id: newId(),
+            quoteId: params.data.quoteId,
+            budgetLineCode: link.budgetLineCode,
+            extraId: link.extraId,
+          })),
+        );
+      }
+      return tx
+        .select()
+        .from(quoteLinksTable)
+        .where(eq(quoteLinksTable.quoteId, params.data.quoteId))
+        .orderBy(asc(quoteLinksTable.id));
+    });
+    res.json(UpdateBudgetQuoteLinksResponse.parse(links));
+  },
+);
 
 router.post("/budget/quotes", async (req, res): Promise<void> => {
   await ensureSeedData();

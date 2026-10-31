@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  date,
   integer,
   pgEnum,
   pgTable,
@@ -8,6 +10,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export type SourceChild = {
   name: string;
@@ -25,6 +28,16 @@ export const extraPriceStatusEnum = pgEnum("extra_price_status", [
   "estimate",
   "quoted",
   "pending",
+]);
+export const quoteScopeTypeEnum = pgEnum("quote_scope_type", [
+  "supplied",
+  "installed",
+  "unknown",
+]);
+export const quoteVatIncludedEnum = pgEnum("quote_vat_included", [
+  "yes",
+  "no",
+  "unknown",
 ]);
 
 export const budgetMetaTable = pgTable("budget_meta", {
@@ -92,6 +105,11 @@ export const budgetQuotesTable = pgTable("budget_quotes", {
   documentType: text("document_type").notNull().default("unknown"),
   status: text("status").notNull().default("needs_review"),
   amount: real("amount"),
+  priceScope: text("price_scope").notNull().default("per house unit"),
+  scopeType: quoteScopeTypeEnum("scope_type").notNull().default("unknown"),
+  vatIncluded: quoteVatIncludedEnum("vat_included").notNull().default("unknown"),
+  validityDate: date("validity_date", { mode: "string" }),
+  driveUrl: text("drive_url"),
   buildingType: text("building_type"),
   modifiedAt: timestamp("modified_at", { withTimezone: true }),
   sourceUrl: text("source_url").notNull(),
@@ -116,9 +134,31 @@ export const extrasTable = pgTable("extras", {
   priceScope: text("price_scope").notNull().default("per house unit"),
   unitPrice: real("unit_price"),
   priceStatus: extraPriceStatusEnum("price_status").notNull().default("pending"),
-  quoteId: text("quote_id").references(() => budgetQuotesTable.id),
+  quoteId: text("quote_id").references(() => budgetQuotesTable.id, {
+    onDelete: "set null",
+  }),
   notes: text("notes"),
 });
+
+export const quoteLinksTable = pgTable(
+  "quote_links",
+  {
+    id: text("id").primaryKey(),
+    quoteId: text("quote_id")
+      .notNull()
+      .references(() => budgetQuotesTable.id, { onDelete: "cascade" }),
+    budgetLineCode: text("budget_line_code"),
+    extraId: text("extra_id").references(() => extrasTable.id, {
+      onDelete: "cascade",
+    }),
+  },
+  (table) => [
+    check(
+      "quote_links_exactly_one_target",
+      sql`(${table.budgetLineCode} IS NOT NULL) <> (${table.extraId} IS NOT NULL)`,
+    ),
+  ],
+);
 
 export const plannerInputsTable = pgTable("planner_inputs", {
   id: text("id").primaryKey(),

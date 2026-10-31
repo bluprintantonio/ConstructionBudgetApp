@@ -9,18 +9,20 @@ import {
   X, AlertCircle, Pencil, Landmark
 } from 'lucide-react';
 import {
-  BudgetExtra, BudgetExtraUpdate, BudgetLine, BudgetQuote, BudgetLineInput, BudgetQuoteInput,
+  BudgetExtra, BudgetExtraUpdate, BudgetLine, BudgetQuote, BudgetQuoteLink, BudgetLineInput, BudgetQuoteInput,
   BudgetQuoteStatus, BudgetQuoteDocumentType,
   useHealthCheck, useGetBudgetDashboard, useGetBudgetProjects, useGetBudgetSources,
   useCheckBudgetSourceConnection,
   useGetBudgetExtras, useUpdateBudgetExtra,
-  useGetBudgetLines, useGetBudgetQuotes, useCreateBudgetLine, useImportBudgetLines,
+  useGetBudgetLines, useGetBudgetQuotes, useGetBudgetQuoteLinks, useUpdateBudgetQuoteLinks,
+  useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
   useDeleteBudgetQuote, getGetBudgetDashboardQueryKey, getGetBudgetLinesQueryKey,
   getGetBudgetExtrasQueryKey,
-  getGetBudgetQuotesQueryKey
+  getGetBudgetQuotesQueryKey, getGetBudgetQuoteLinksQueryKey
 } from '@workspace/api-client-react';
 import { calculatePackTotals } from '@workspace/engine/packs';
+import { calculateQuoteComparisons, type QuoteWarnings } from '@workspace/engine/quotes';
 import PlannerPage from './pages/planner';
 
 const queryClient = new QueryClient();
@@ -54,6 +56,23 @@ const currency = (amount: number | null | undefined, code: CurrencyCode = 'EUR')
   : new Intl.NumberFormat('pt-PT', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
 const shortDate = (value?: string | null) => value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value)) : '—';
 const titleCase = (value?: string | null) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
+const localDateString = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
+const preciseCurrency = (amount: number | null | undefined, code: CurrencyCode = 'EUR') => amount == null
+  ? '—'
+  : new Intl.NumberFormat('pt-PT', { style: 'currency', currency: code, maximumFractionDigits: 2 }).format(amount);
+function QuoteWarningLabels({ warnings }: { warnings: QuoteWarnings }) {
+  const labels = [
+    warnings.scopeUnknown ? 'Scope type unknown' : null,
+    warnings.vatUnknown ? 'VAT basis unknown' : null,
+    warnings.expired ? 'Quote validity has expired' : null,
+  ].filter((label): label is string => label !== null);
+  return labels.length
+    ? <strong role="alert">Warning: {labels.join(' · ')}</strong>
+    : null;
+}
 
 function parseCsvRows(input: string): string[][] {
   const firstLine = input.split(/\r?\n/, 1)[0] || '';
@@ -335,15 +354,23 @@ function extraDraftFrom(extra: BudgetExtra): ExtraDraft {
 function BudgetPage() {
   const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
   const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
+  const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
   const { currencyCode } = useCurrency();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
   const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
   const [extraDrafts, setExtraDrafts] = useState<Record<string, ExtraDraft>>({});
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
+  const quoteComparisons = useMemo(() => calculateQuoteComparisons(
+    quotesQuery.data || [],
+    quoteLinksQuery.data || [],
+    lines.map(line => ({ code: line.code, standardTotal: line.standardTotal })),
+    localDateString(),
+  ), [quotesQuery.data, quoteLinksQuery.data, lines]);
+  const quotesById = new Map((quotesQuery.data || []).map(quote => [quote.id, quote]));
   const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
   const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
   const packMetrics = dashboard.data?.sourceMetrics || [];
-  const reload = () => { void query.refetch(); void dashboard.refetch(); };
+  const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); };
   const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
   const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
     ...current,
@@ -371,6 +398,21 @@ function BudgetPage() {
       onError: () => setMessage(`Could not save ${extra.name}.`),
     });
   };
+  const useQuotePrice = (extra: BudgetExtra, quote: BudgetQuote) => {
+    if (quote.amount == null) return;
+    updateExtra.mutate({
+      extraId: extra.id,
+      data: { unitPrice: quote.amount, priceStatus: 'quoted', quoteId: quote.id },
+    }, {
+      onSuccess: () => {
+        setExtraDrafts(current => { const next = { ...current }; delete next[extra.id]; return next; });
+        setMessage(`Used ${quote.fileName} price for ${extra.name}.`);
+        void client.invalidateQueries({ queryKey: getGetBudgetExtrasQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() });
+      },
+      onError: () => setMessage(`Could not use ${quote.fileName} for ${extra.name}.`),
+    });
+  };
   const save = (e: FormEvent<HTMLFormElement>, line?: BudgetLine) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
     const text = (key: string) => String(fd.get(key) || '').trim();
@@ -395,10 +437,35 @@ function BudgetPage() {
     <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
      {packMetrics.length > 0 && <><div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2>Pack totals</h2></div></div><div className="metrics-grid">{packMetrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div></>}
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
+     {(quotesQuery.isError || quoteLinksQuery.isError) && <div className="inline-message"><AlertCircle size={15}/>Quote comparisons could not be loaded. Refresh to try again.</div>}
     <section className="panel register-panel">
       <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
       <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div><div className="table-scroll scrollbar-thin"><table className="data-table budget-table materials-table"><thead><tr><th>CODE</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th>ECO</th><th>STANDARD</th><th>PREMIUM</th><th/></tr></thead><tbody>
-      {filtered.map(line => <tr key={line.id} data-testid={`row-budget-line-${line.id}`}><td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td><td className="material-chapter">{line.category}</td><td><strong>{line.item}</strong></td><td>{line.unit || '—'}</td><td className="money-cell">{line.quantity ?? '—'}</td><td className="material-scenario"><small>Unit: {currency(line.ecoUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.ecoTotal, currencyCode)}</strong></td><td className="material-scenario"><small>Unit: {currency(line.standardUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.standardTotal, currencyCode)}</strong></td><td className="material-scenario"><small>Unit: {currency(line.premiumUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.premiumTotal, currencyCode)}</strong></td><td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td></tr>)}
+       {filtered.map(line => {
+         const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
+         return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
+           <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
+           <td className="material-chapter">{line.category}</td>
+           <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
+             const quote = quotesById.get(comparison.quoteId);
+             if (!quote) return null;
+             const targetCodes = comparison.budgetLineCodes.join(', ');
+             return <div className="quote-note" key={quote.id} data-testid={`comparison-line-${line.code}-${quote.id}`}>
+               <div><a href={quote.driveUrl || quote.sourceUrl} target="_blank" rel="noreferrer">{quote.fileName}</a>{comparison.lowest && <strong> · lowest</strong>}</div>
+               <div>CSV total for {targetCodes}: {preciseCurrency(comparison.csvTotal, currencyCode)} · Quote: {preciseCurrency(quote.amount, currencyCode)}</div>
+               <div>Difference: {preciseCurrency(comparison.difference, currencyCode)} · {comparison.differencePercent == null ? '—' : `${comparison.differencePercent.toFixed(2)}%`}</div>
+               <div>{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
+               <QuoteWarningLabels warnings={comparison.warnings}/>
+             </div>;
+           })}</td>
+           <td>{line.unit || '—'}</td>
+           <td className="money-cell">{line.quantity ?? '—'}</td>
+           <td className="material-scenario"><small>Unit: {currency(line.ecoUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.ecoTotal, currencyCode)}</strong></td>
+           <td className="material-scenario"><small>Unit: {currency(line.standardUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.standardTotal, currencyCode)}</strong></td>
+           <td className="material-scenario"><small>Unit: {currency(line.premiumUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.premiumTotal, currencyCode)}</strong></td>
+           <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
+         </tr>;
+       })}
       {!filtered.length && <tr><td colSpan={9}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
       </tbody></table></div>
       <div className="table-footer"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
@@ -406,7 +473,7 @@ function BudgetPage() {
     <section className="panel register-panel">
       <div className="register-toolbar"><strong>Extras</strong><span className="source-ref">Unit price is the total for one complete item.</span></div>
       {extrasQuery.isLoading ? <div className="table-footer">Loading extras…</div> : extrasQuery.isError ? <div className="inline-message"><AlertCircle size={15}/>Could not load extras.<button className="text-link" onClick={() => void extrasQuery.refetch()}>Retry</button></div> : <div className="table-scroll scrollbar-thin"><table className="data-table">
-        <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>PRICE SCOPE</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th/></tr></thead>
+         <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>PRICE SCOPE</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th>LINKED QUOTES</th><th/></tr></thead>
         <tbody>{(extrasQuery.data || []).map(extra => {
           const draft = draftForExtra(extra);
           return <tr key={extra.id} data-testid={`row-extra-${extra.id}`}>
@@ -418,6 +485,17 @@ function BudgetPage() {
             <td><label className="form-field"><input aria-label={`${extra.name} complete item price`} data-testid={`input-extra-unit-price-${extra.id}`} type="number" min="0" step="0.01" placeholder="—" value={draft.unitPrice} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { unitPrice: event.target.value })}/></label>{extra.unitPrice == null && !draft.unitPrice.trim() && <small className="source-ref" data-testid={`status-extra-price-pending-${extra.id}`}>Price pending</small>}</td>
             <td><label className="form-field"><select aria-label={`${extra.name} price status`} data-testid={`select-extra-status-${extra.id}`} value={draft.priceStatus} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { priceStatus: event.target.value as BudgetExtra['priceStatus'] })}>{(['estimate', 'quoted', 'pending'] as BudgetExtra['priceStatus'][]).map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></label></td>
             <td><label className="form-field"><input aria-label={`${extra.name} notes`} data-testid={`input-extra-notes-${extra.id}`} value={draft.notes} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { notes: event.target.value })}/></label></td>
+           <td>{quoteComparisons.filter(comparison => comparison.extraIds.includes(extra.id)).map(comparison => {
+             const quote = quotesById.get(comparison.quoteId);
+             if (!quote) return null;
+             return <div className="quote-note" key={quote.id} data-testid={`comparison-extra-${extra.id}-${quote.id}`}>
+               <div><a href={quote.driveUrl || quote.sourceUrl} target="_blank" rel="noreferrer">{quote.fileName}</a>{comparison.lowest && <strong> · lowest</strong>}</div>
+               <div>{preciseCurrency(quote.amount, currencyCode)} · {quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)}</div>
+               <div>Valid until {shortDate(quote.validityDate)}</div>
+               <QuoteWarningLabels warnings={comparison.warnings}/>
+               <button className="button button-secondary" data-testid={`button-use-quote-price-${extra.id}-${quote.id}`} disabled={updateExtra.isPending || quote.amount == null} onClick={() => useQuotePrice(extra, quote)}>Use quote price</button>
+             </div>;
+           })}</td>
             <td><button className="button button-secondary" data-testid={`button-save-extra-${extra.id}`} disabled={updateExtra.isPending} onClick={() => saveExtra(extra)}>Save</button></td>
           </tr>;
         })}</tbody>
@@ -443,45 +521,193 @@ function BudgetPage() {
 }
 
 function QuotesPage() {
-  const query = useGetBudgetQuotes(); const projects = useGetBudgetProjects(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
+  const query = useGetBudgetQuotes();
+  const linksQuery = useGetBudgetQuoteLinks();
+  const linesQuery = useGetBudgetLines();
+  const extrasQuery = useGetBudgetExtras();
+  const projects = useGetBudgetProjects();
+  const dashboard = useGetBudgetDashboard();
+  const client = useQueryClient();
   const { currencyCode } = useCurrency();
-  const create = useCreateBudgetQuote(); const update = useUpdateBudgetQuote(); const remove = useDeleteBudgetQuote();
-  const [search, setSearch] = useState(''); const [filter, setFilter] = useState('all'); const [dialog, setDialog] = useState(false); const [editing, setEditing] = useState<BudgetQuote | null>(null); const [message, setMessage] = useState('');
-  const quotes = query.data || []; const filtered = useMemo(() => quotes.filter(q => (filter === 'all' || q.status === filter) && `${q.fileName} ${q.vendor || ''} ${q.category} ${q.buildingType || ''}`.toLowerCase().includes(search.toLowerCase())), [quotes, filter, search]);
-  const reload = () => { void query.refetch(); void dashboard.refetch(); };
-  const save = (e: FormEvent<HTMLFormElement>, quote?: BudgetQuote) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const val = (k: string) => String(fd.get(k) || ''); const amountText = val('amount');
-    const payload: BudgetQuoteInput = { fileName: val('fileName'), category: val('category'), vendor: val('vendor') || null, documentType: val('documentType') as BudgetQuoteInput['documentType'], status: val('status') as BudgetQuoteInput['status'], amount: amountText ? Number(amountText) : null, buildingType: val('buildingType') || null, modifiedAt: val('modifiedAt') || null, sourceUrl: val('sourceUrl'), sourceFolderUrl: val('sourceFolderUrl') || null, note: val('note') || null };
-    const done = () => { setDialog(false); setEditing(null); setMessage(quote ? 'Document details updated.' : 'Document added to review.'); void client.invalidateQueries({ queryKey: getGetBudgetQuotesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); };
-    quote ? update.mutate({ quoteId: quote.id, data: payload }, { onSuccess: done }) : create.mutate({ data: payload }, { onSuccess: done });
+  const create = useCreateBudgetQuote();
+  const update = useUpdateBudgetQuote();
+  const updateLinks = useUpdateBudgetQuoteLinks();
+  const remove = useDeleteBudgetQuote();
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [dialog, setDialog] = useState(false);
+  const [editing, setEditing] = useState<BudgetQuote | null>(null);
+  const [message, setMessage] = useState('');
+  const [selectedLineCodes, setSelectedLineCodes] = useState<string[]>([]);
+  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
+  const quotes = query.data || [];
+  const links = linksQuery.data || [];
+  const lines = linesQuery.data || [];
+  const extras = extrasQuery.data || [];
+  const filtered = useMemo(
+    () => quotes.filter(q => (filter === 'all' || q.status === filter) && `${q.fileName} ${q.vendor || ''} ${q.category} ${q.buildingType || ''}`.toLowerCase().includes(search.toLowerCase())),
+    [quotes, filter, search],
+  );
+  const quoteComparisons = useMemo(() => calculateQuoteComparisons(
+    quotes,
+    links,
+    lines.map(line => ({ code: line.code, standardTotal: line.standardTotal })),
+    localDateString(),
+  ), [quotes, links, lines]);
+  const quoteComparisonById = new Map(quoteComparisons.map(comparison => [comparison.quoteId, comparison]));
+  const linksByQuote = new Map<string, BudgetQuoteLink[]>();
+  for (const link of links) {
+    const current = linksByQuote.get(link.quoteId) || [];
+    current.push(link);
+    linksByQuote.set(link.quoteId, current);
+  }
+  const reload = () => {
+    void query.refetch();
+    void linksQuery.refetch();
+    void linesQuery.refetch();
+    void extrasQuery.refetch();
+    void dashboard.refetch();
   };
-  const deleteQuote = (q: BudgetQuote) => { if (window.confirm(`Remove “${q.fileName}” from document review?`)) remove.mutate({ quoteId: q.id }, { onSuccess: () => { setMessage('Document removed.'); void client.invalidateQueries({ queryKey: getGetBudgetQuotesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); } }); };
-  if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
+  const closeDialog = () => {
+    setDialog(false);
+    setEditing(null);
+    setSelectedLineCodes([]);
+    setSelectedExtraIds([]);
+  };
+  const openCreate = () => {
+    setEditing(null);
+    setSelectedLineCodes([]);
+    setSelectedExtraIds([]);
+    setDialog(true);
+  };
+  const openEdit = (quote: BudgetQuote) => {
+    setEditing(quote);
+    const quoteLinks = linksByQuote.get(quote.id) || [];
+    setSelectedLineCodes(quoteLinks.flatMap(link => link.budgetLineCode ? [link.budgetLineCode] : []));
+    setSelectedExtraIds(quoteLinks.flatMap(link => link.extraId ? [link.extraId] : []));
+    setDialog(true);
+  };
+  const finishQuoteSave = (savedQuote: BudgetQuote, wasEditing: boolean) => {
+    const quoteTargets = [
+      ...selectedLineCodes.map(budgetLineCode => ({ budgetLineCode, extraId: null })),
+      ...selectedExtraIds.map(extraId => ({ budgetLineCode: null, extraId })),
+    ];
+    updateLinks.mutate({ quoteId: savedQuote.id, data: { links: quoteTargets } }, {
+      onSuccess: () => {
+        closeDialog();
+        setMessage(wasEditing ? 'Quote details and links saved.' : 'Quote added with its links.');
+        void client.invalidateQueries({ queryKey: getGetBudgetQuotesQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetQuoteLinksQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() });
+      },
+      onError: () => {
+        setMessage('Quote details saved, but its line and extra links could not be saved.');
+        void client.invalidateQueries({ queryKey: getGetBudgetQuotesQueryKey() });
+      },
+    });
+  };
+  const save = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const val = (key: string) => String(fd.get(key) || '').trim();
+    const amountText = val('amount');
+    const payload: BudgetQuoteInput = {
+      fileName: val('fileName'),
+      category: val('category'),
+      vendor: val('vendor') || null,
+      documentType: val('documentType') as BudgetQuoteInput['documentType'],
+      status: val('status') as BudgetQuoteInput['status'],
+      amount: amountText ? Number(amountText) : null,
+      priceScope: val('priceScope') || 'per house unit',
+      scopeType: val('scopeType') as BudgetQuoteInput['scopeType'],
+      vatIncluded: val('vatIncluded') as BudgetQuoteInput['vatIncluded'],
+      validityDate: val('validityDate') || null,
+      driveUrl: val('driveUrl') || null,
+      buildingType: val('buildingType') || null,
+      modifiedAt: val('modifiedAt') || null,
+      sourceUrl: val('sourceUrl'),
+      sourceFolderUrl: val('sourceFolderUrl') || null,
+      note: val('note') || null,
+    };
+    if (editing) {
+      update.mutate({ quoteId: editing.id, data: payload }, {
+        onSuccess: savedQuote => finishQuoteSave(savedQuote, true),
+      });
+    } else {
+      create.mutate({ data: payload }, {
+        onSuccess: savedQuote => finishQuoteSave(savedQuote, false),
+      });
+    }
+  };
+  const deleteQuote = (quote: BudgetQuote) => {
+    if (!window.confirm(`Remove “${quote.fileName}” from document review?`)) return;
+    remove.mutate({ quoteId: quote.id }, {
+      onSuccess: () => {
+        setMessage('Document removed.');
+        void client.invalidateQueries({ queryKey: getGetBudgetQuotesQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetQuoteLinksQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetExtrasQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() });
+      },
+    });
+  };
+  if (query.isLoading || linksQuery.isLoading || linesQuery.isLoading || extrasQuery.isLoading) return <LoadingBlock/>;
+  if (query.isError || linksQuery.isError || linesQuery.isError || extrasQuery.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
-    <PageHeader eyebrow="WORKSPACE / DOCUMENT REVIEW" title="Quotes & documents" description="Review supplier proposals alongside the source file and folder they came from." action={<button className="button button-primary" onClick={() => { setEditing(null); setDialog(true); }}><Plus size={16}/> Add document</button>}/>
+    <PageHeader eyebrow="WORKSPACE / DOCUMENT REVIEW" title="Quotes & documents" description="Review supplier proposals alongside the source file and folder they came from." action={<button className="button button-primary" onClick={openCreate}><Plus size={16}/> Add document</button>}/>
     <div className="review-banner"><div className="review-banner-icon"><FileCheck2 size={19}/></div><div><strong>{dashboard.data?.quotesNeedingReview ?? quotes.filter(q => q.status === 'needs_review').length} documents need a closer look</strong><span>Check the linked proposal and enter its price before relying on the record.</span></div><div className="banner-count">{quotes.length.toString().padStart(2, '0')}<small>FILES</small></div></div>
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
     <section className="panel quotes-panel">
-      <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search documents" placeholder="Search file, supplier, category…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter quote status"><option value="all">All statuses</option>{quoteStatuses.map(s => <option key={s} value={s}>{titleCase(s)}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
+      <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search documents" placeholder="Search file, supplier, category…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter quote status"><option value="all">All statuses</option>{quoteStatuses.map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
       <div className="quote-list">
-        {filtered.map((q, i) => <article key={q.id} className={`quote-row fade-up ${q.status === 'needs_review' ? 'quote-needs-review' : ''}`} style={{ animationDelay: `${i * 35}ms` }} data-testid={`card-quote-${q.id}`}>
-          <div className="file-icon"><FileText size={19}/><span>{q.documentType === 'proposal' ? 'PDF' : q.documentType.slice(0,3).toUpperCase()}</span></div>
-          <div className="quote-details"><div className="quote-title-line"><h3>{q.fileName}</h3><StatusPill kind="quote" value={q.status}/></div><div className="quote-meta"><span>{q.vendor || 'Vendor not identified'}</span><i/> <span>{q.category}</span>{q.buildingType && <><i/><span>{q.buildingType}</span></>}</div><div className="quote-note">{q.note || 'No review note added.'}</div><div className="source-actions"><a href={q.sourceUrl} target="_blank" rel="noreferrer" className="source-action"><ExternalLink size={13}/> Open source document</a>{q.sourceFolderUrl && <a href={q.sourceFolderUrl} target="_blank" rel="noreferrer" className="source-action"><Folder size={13}/> Parent folder</a>}</div></div>
-          <div className="quote-amount"><small>AMOUNT</small><strong>{currency(q.amount, currencyCode)}</strong><span>Modified {shortDate(q.modifiedAt)}</span></div>
-          <div className="quote-controls"><button className="button button-quiet" onClick={() => { setEditing(q); setDialog(true); }}><Pencil size={14}/> Review</button><button className="icon-button small danger-hover" title="Remove document" aria-label={`Remove ${q.fileName}`} onClick={() => deleteQuote(q)}><Trash2 size={14}/></button></div>
-        </article>)}
-        {!filtered.length && <EmptyState icon={FileCheck2} title={quotes.length ? 'No matching documents' : 'No supplier documents linked'} body={quotes.length ? 'Adjust your search or status filter.' : 'Add a proposal or estimate to connect it with the project register.'} action={!quotes.length ? <button className="button button-primary" onClick={() => setDialog(true)}><Plus size={15}/> Add a document</button> : undefined}/>}
+        {filtered.map((quote, index) => {
+          const comparison = quoteComparisonById.get(quote.id);
+          const quoteLinks = linksByQuote.get(quote.id) || [];
+          const linkedNames = quoteLinks.map(link => {
+            if (link.budgetLineCode) {
+              const line = lines.find(item => item.code === link.budgetLineCode);
+              return line ? `${line.code} · ${line.item}` : link.budgetLineCode;
+            }
+            const extra = extras.find(item => item.id === link.extraId);
+            return extra?.name || 'Unknown extra';
+          });
+          const driveUrl = quote.driveUrl || quote.sourceUrl;
+          return <article key={quote.id} className={`quote-row fade-up ${quote.status === 'needs_review' ? 'quote-needs-review' : ''}`} style={{ animationDelay: `${index * 35}ms` }} data-testid={`card-quote-${quote.id}`}>
+            <div className="file-icon"><FileText size={19}/><span>{quote.documentType === 'proposal' ? 'PDF' : quote.documentType.slice(0,3).toUpperCase()}</span></div>
+            <div className="quote-details">
+              <div className="quote-title-line"><h3>{quote.fileName}</h3><StatusPill kind="quote" value={quote.status}/></div>
+              <div className="quote-meta"><span>{quote.vendor || 'Vendor not identified'}</span><i/><span>{quote.category}</span>{quote.buildingType && <><i/><span>{quote.buildingType}</span></>}</div>
+              <div className="quote-note">{quote.note || 'No review note added.'}</div>
+              <div className="quote-note">{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
+              {linkedNames.length > 0 && <div className="quote-note">Linked to: {linkedNames.join(' · ')}</div>}
+              {comparison && <div className="quote-note"><QuoteWarningLabels warnings={comparison.warnings}/>{comparison.lowest && <strong>Lowest</strong>}</div>}
+              <div className="source-actions"><a href={driveUrl} target="_blank" rel="noreferrer" className="source-action"><ExternalLink size={13}/> Open in Drive</a>{quote.sourceFolderUrl && <a href={quote.sourceFolderUrl} target="_blank" rel="noreferrer" className="source-action"><Folder size={13}/> Parent folder</a>}</div>
+            </div>
+            <div className="quote-amount"><small>AMOUNT</small><strong>{currency(quote.amount, currencyCode)}</strong><span>Modified {shortDate(quote.modifiedAt)}</span></div>
+            <div className="quote-controls"><button className="button button-quiet" onClick={() => openEdit(quote)}><Pencil size={14}/> Review</button><button className="icon-button small danger-hover" title="Remove document" aria-label={`Remove ${quote.fileName}`} onClick={() => deleteQuote(quote)}><Trash2 size={14}/></button></div>
+          </article>;
+        })}
+        {!filtered.length && <EmptyState icon={FileCheck2} title={quotes.length ? 'No matching documents' : 'No supplier documents linked'} body={quotes.length ? 'Adjust your search or status filter.' : 'Add a proposal or estimate to connect it with the project register.'} action={!quotes.length ? <button className="button button-primary" onClick={openCreate}><Plus size={15}/> Add a document</button> : undefined}/>}
       </div>
       <div className="table-footer"><span>{filtered.length} documents</span><span>Linked source URLs open in a new tab</span></div>
     </section>
-    <div className="data-footnote"><ShieldCheck size={14}/> Proposal prices have not been extracted from the PDFs. Enter amounts only after checking the linked source.</div>
-    <Dialog open={dialog} title={editing ? 'Review document details' : 'Add a source document'} subtitle="Link the proposal and keep its review context in one place." onClose={() => { setDialog(false); setEditing(null); }}>
-      <form className="form-grid" onSubmit={e => save(e, editing || undefined)}>
+    <div className="data-footnote"><ShieldCheck size={14}/> Proposal prices are entered by hand; PDF contents are not read by the app.</div>
+    <Dialog open={dialog} title={editing ? 'Review document details' : 'Add a source document'} subtitle="Link the proposal to budget lines or extras and keep its review context in one place." onClose={closeDialog}>
+      <form className="form-grid" onSubmit={save}>
         <Field label="File name"><input required name="fileName" defaultValue={editing?.fileName || ''} placeholder="Supplier proposal.pdf"/></Field><Field label="Category"><input required name="category" defaultValue={editing?.category || ''} placeholder="Work category"/></Field>
-        <Field label="Vendor"><input name="vendor" defaultValue={editing?.vendor || ''} placeholder="Supplier name"/></Field><Field label="Document type"><select name="documentType" defaultValue={editing?.documentType || 'unknown'}>{documentTypes.map(s => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field>
-        <Field label="Review status"><select name="status" defaultValue={editing?.status || 'needs_review'}>{quoteStatuses.map(s => <option key={s} value={s}>{titleCase(s)}</option>)}</select></Field><Field label="Amount"><input name="amount" type="number" step="0.01" defaultValue={editing?.amount ?? ''} placeholder="Not stated"/></Field>
-        <Field label="Building type"><select name="buildingType" defaultValue={editing?.buildingType || ''}><option value="">Not specified</option>{projects.data?.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select></Field><Field label="Modified date"><input name="modifiedAt" type="date" defaultValue={editing?.modifiedAt?.slice(0,10) || ''}/></Field>
-        <Field label="Source document URL" wide><input required type="url" name="sourceUrl" defaultValue={editing?.sourceUrl || ''} placeholder="https://drive.google.com/…"/></Field><Field label="Source folder URL" wide><input type="url" name="sourceFolderUrl" defaultValue={editing?.sourceFolderUrl || ''} placeholder="Optional folder link"/></Field><Field label="Review note" wide><textarea name="note" rows={3} defaultValue={editing?.note || ''} placeholder="What should the contractor confirm?"/></Field>
-        <FormActions onCancel={() => { setDialog(false); setEditing(null); }} pending={create.isPending || update.isPending} label={editing ? 'Save review' : 'Add document'}/>
+        <Field label="Vendor"><input name="vendor" defaultValue={editing?.vendor || ''} placeholder="Supplier name"/></Field><Field label="Document type"><select name="documentType" defaultValue={editing?.documentType || 'unknown'}>{documentTypes.map(type => <option key={type} value={type}>{titleCase(type)}</option>)}</select></Field>
+        <Field label="Review status"><select name="status" defaultValue={editing?.status || 'needs_review'}>{quoteStatuses.map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></Field><Field label="Amount"><input name="amount" type="number" step="0.01" defaultValue={editing?.amount ?? ''} placeholder="Not stated"/></Field>
+        <Field label="Price scope"><input name="priceScope" defaultValue={editing?.priceScope || 'per house unit'}/></Field><Field label="Scope type"><select name="scopeType" defaultValue={editing?.scopeType || 'unknown'}><option value="supplied">Supplied</option><option value="installed">Installed</option><option value="unknown">Unknown</option></select></Field>
+        <Field label="VAT included"><select name="vatIncluded" defaultValue={editing?.vatIncluded || 'unknown'}><option value="yes">Yes</option><option value="no">No</option><option value="unknown">Unknown</option></select></Field><Field label="Validity date"><input name="validityDate" type="date" defaultValue={editing?.validityDate || ''}/></Field>
+        <Field label="Building type"><select name="buildingType" defaultValue={editing?.buildingType || ''}><option value="">Not specified</option>{projects.data?.map(project => <option key={project.id} value={project.name}>{project.name}</option>)}</select></Field><Field label="Modified date"><input name="modifiedAt" type="date" defaultValue={editing?.modifiedAt?.slice(0,10) || ''}/></Field>
+        <Field label="Source document URL" wide><input required type="url" name="sourceUrl" defaultValue={editing?.sourceUrl || ''} placeholder="https://drive.google.com/…"/></Field>
+        <Field label="Drive file URL" wide><input type="url" name="driveUrl" defaultValue={editing?.driveUrl || ''} placeholder="Optional direct link from boxes"/></Field>
+        <Field label="Source folder URL" wide><input type="url" name="sourceFolderUrl" defaultValue={editing?.sourceFolderUrl || ''} placeholder="Optional folder link"/></Field>
+        <Field label="Review note" wide><textarea name="note" rows={3} defaultValue={editing?.note || ''} placeholder="What should the contractor confirm?"/></Field>
+        <Field label="Linked budget lines" wide><select multiple size={6} aria-label="Linked budget lines" data-testid="select-quote-budget-lines" value={selectedLineCodes} disabled={linesQuery.isLoading || linesQuery.isError} onChange={event => setSelectedLineCodes(Array.from(event.currentTarget.selectedOptions, option => option.value))}>{lines.filter(line => line.code != null).map(line => <option key={line.id} value={line.code!}>{line.code} · {line.item}</option>)}</select><small>Use Ctrl or Command to select multiple lines.</small></Field>
+        <Field label="Linked extras" wide><select multiple size={5} aria-label="Linked extras" data-testid="select-quote-extras" value={selectedExtraIds} disabled={extrasQuery.isLoading || extrasQuery.isError} onChange={event => setSelectedExtraIds(Array.from(event.currentTarget.selectedOptions, option => option.value))}>{extras.map(extra => <option key={extra.id} value={extra.id}>{extra.name}</option>)}</select><small>Use Ctrl or Command to select multiple extras.</small></Field>
+        {(linesQuery.isError || extrasQuery.isError) && <div className="inline-message"><AlertCircle size={15}/>Could not load link targets.</div>}
+        <FormActions onCancel={closeDialog} pending={create.isPending || update.isPending || updateLinks.isPending} label={editing ? 'Save review' : 'Add document'}/>
       </form>
     </Dialog>
   </div>;

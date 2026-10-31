@@ -420,6 +420,7 @@ export const UpdateBudgetExtraBody = zod.object({
   "quantity": zod.number().int().min(updateBudgetExtraBodyQuantityMin).optional(),
   "unitPrice": zod.number().min(updateBudgetExtraBodyUnitPriceMin).nullish(),
   "priceStatus": zod.enum(['estimate', 'quoted', 'pending']).optional(),
+  "quoteId": zod.string().nullish(),
   "notes": zod.string().nullish()
 })
 
@@ -441,6 +442,8 @@ export const UpdateBudgetExtraResponse = zod.object({
 /**
  * @summary List supplier quotes and source documents
  */
+export const getBudgetQuotesResponsePriceScopeDefault = `per house unit`;
+
 export const GetBudgetQuotesResponseItem = zod.object({
   "id": zod.string(),
   "fileName": zod.string(),
@@ -449,6 +452,11 @@ export const GetBudgetQuotesResponseItem = zod.object({
   "documentType": zod.enum(['proposal', 'estimate', 'specification', 'comparison', 'unknown']),
   "status": zod.enum(['needs_review', 'quoted', 'accepted', 'rejected']),
   "amount": zod.number().nullable(),
+  "priceScope": zod.string().default(getBudgetQuotesResponsePriceScopeDefault),
+  "scopeType": zod.enum(['supplied', 'installed', 'unknown']),
+  "vatIncluded": zod.enum(['yes', 'no', 'unknown']),
+  "validityDate": zod.string().nullable(),
+  "driveUrl": zod.string().url().nullable(),
   "buildingType": zod.string().nullable(),
   "modifiedAt": zod.string().nullable(),
   "sourceUrl": zod.string(),
@@ -465,7 +473,7 @@ export const GetBudgetQuotesResponse = zod.array(GetBudgetQuotesResponseItem)
  */
 
 
-
+export const createBudgetQuoteBodyPriceScopeDefault = `per house unit`;
 
 
 export const CreateBudgetQuoteBody = zod.object({
@@ -475,12 +483,19 @@ export const CreateBudgetQuoteBody = zod.object({
   "documentType": zod.enum(['proposal', 'estimate', 'specification', 'comparison', 'unknown']),
   "status": zod.enum(['needs_review', 'quoted', 'accepted', 'rejected']),
   "amount": zod.number().nullish(),
+  "priceScope": zod.string().default(createBudgetQuoteBodyPriceScopeDefault),
+  "scopeType": zod.enum(['supplied', 'installed', 'unknown']).optional(),
+  "vatIncluded": zod.enum(['yes', 'no', 'unknown']).optional(),
+  "validityDate": zod.string().nullish(),
+  "driveUrl": zod.string().url().nullish(),
   "buildingType": zod.string().nullish(),
   "modifiedAt": zod.string().nullish(),
   "sourceUrl": zod.string().min(1),
   "sourceFolderUrl": zod.string().nullish(),
   "note": zod.string().nullish()
 })
+
+export const createBudgetQuoteResponsePriceScopeDefault = `per house unit`;
 
 export const CreateBudgetQuoteResponse = zod.object({
   "id": zod.string(),
@@ -490,6 +505,11 @@ export const CreateBudgetQuoteResponse = zod.object({
   "documentType": zod.enum(['proposal', 'estimate', 'specification', 'comparison', 'unknown']),
   "status": zod.enum(['needs_review', 'quoted', 'accepted', 'rejected']),
   "amount": zod.number().nullable(),
+  "priceScope": zod.string().default(createBudgetQuoteResponsePriceScopeDefault),
+  "scopeType": zod.enum(['supplied', 'installed', 'unknown']),
+  "vatIncluded": zod.enum(['yes', 'no', 'unknown']),
+  "validityDate": zod.string().nullable(),
+  "driveUrl": zod.string().url().nullable(),
   "buildingType": zod.string().nullable(),
   "modifiedAt": zod.string().nullable(),
   "sourceUrl": zod.string(),
@@ -519,12 +539,19 @@ export const UpdateBudgetQuoteBody = zod.object({
   "documentType": zod.enum(['proposal', 'estimate', 'specification', 'comparison', 'unknown']).optional(),
   "status": zod.enum(['needs_review', 'quoted', 'accepted', 'rejected']).optional(),
   "amount": zod.number().nullish(),
+  "priceScope": zod.string().optional(),
+  "scopeType": zod.enum(['supplied', 'installed', 'unknown']).optional(),
+  "vatIncluded": zod.enum(['yes', 'no', 'unknown']).optional(),
+  "validityDate": zod.string().nullish(),
+  "driveUrl": zod.string().url().nullish(),
   "buildingType": zod.string().nullish(),
   "modifiedAt": zod.string().nullish(),
   "sourceUrl": zod.string().min(1).optional(),
   "sourceFolderUrl": zod.string().nullish(),
   "note": zod.string().nullish()
 })
+
+export const updateBudgetQuoteResponsePriceScopeDefault = `per house unit`;
 
 export const UpdateBudgetQuoteResponse = zod.object({
   "id": zod.string(),
@@ -534,6 +561,11 @@ export const UpdateBudgetQuoteResponse = zod.object({
   "documentType": zod.enum(['proposal', 'estimate', 'specification', 'comparison', 'unknown']),
   "status": zod.enum(['needs_review', 'quoted', 'accepted', 'rejected']),
   "amount": zod.number().nullable(),
+  "priceScope": zod.string().default(updateBudgetQuoteResponsePriceScopeDefault),
+  "scopeType": zod.enum(['supplied', 'installed', 'unknown']),
+  "vatIncluded": zod.enum(['yes', 'no', 'unknown']),
+  "validityDate": zod.string().nullable(),
+  "driveUrl": zod.string().url().nullable(),
   "buildingType": zod.string().nullable(),
   "modifiedAt": zod.string().nullable(),
   "sourceUrl": zod.string(),
@@ -542,6 +574,41 @@ export const UpdateBudgetQuoteResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
+
+
+/**
+ * @summary List quote links to budget lines and extras
+ */
+export const GetBudgetQuoteLinksResponseItem = zod.object({
+  "id": zod.string(),
+  "quoteId": zod.string(),
+  "budgetLineCode": zod.string().nullable(),
+  "extraId": zod.string().nullable()
+})
+export const GetBudgetQuoteLinksResponse = zod.array(GetBudgetQuoteLinksResponseItem)
+
+
+/**
+ * @summary Replace a quote's linked budget lines and extras
+ */
+export const UpdateBudgetQuoteLinksParams = zod.object({
+  "quoteId": zod.coerce.string()
+})
+
+export const UpdateBudgetQuoteLinksBody = zod.object({
+  "links": zod.array(zod.object({
+  "budgetLineCode": zod.string().nullable(),
+  "extraId": zod.string().nullable()
+}))
+})
+
+export const UpdateBudgetQuoteLinksResponseItem = zod.object({
+  "id": zod.string(),
+  "quoteId": zod.string(),
+  "budgetLineCode": zod.string().nullable(),
+  "extraId": zod.string().nullable()
+})
+export const UpdateBudgetQuoteLinksResponse = zod.array(UpdateBudgetQuoteLinksResponseItem)
 
 
 /**

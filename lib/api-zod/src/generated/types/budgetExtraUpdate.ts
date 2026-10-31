@@ -17,5 +17,7 @@ export interface BudgetExtraUpdate {
   unitPrice?: number | null;
   priceStatus?: BudgetExtraUpdatePriceStatus;
   /** @nullable */
+  quoteId?: string | null;
+  /** @nullable */
   notes?: string | null;
 }

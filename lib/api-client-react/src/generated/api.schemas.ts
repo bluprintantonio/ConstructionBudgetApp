@@ -377,6 +377,8 @@ export interface BudgetExtraUpdate {
   unitPrice?: number | null;
   priceStatus?: BudgetExtraUpdatePriceStatus;
   /** @nullable */
+  quoteId?: string | null;
+  /** @nullable */
   notes?: string | null;
 }
 
@@ -401,6 +403,24 @@ export const BudgetQuoteStatus = {
   rejected: 'rejected',
 } as const;
 
+export type BudgetQuoteScopeType = typeof BudgetQuoteScopeType[keyof typeof BudgetQuoteScopeType];
+
+
+export const BudgetQuoteScopeType = {
+  supplied: 'supplied',
+  installed: 'installed',
+  unknown: 'unknown',
+} as const;
+
+export type BudgetQuoteVatIncluded = typeof BudgetQuoteVatIncluded[keyof typeof BudgetQuoteVatIncluded];
+
+
+export const BudgetQuoteVatIncluded = {
+  yes: 'yes',
+  no: 'no',
+  unknown: 'unknown',
+} as const;
+
 export interface BudgetQuote {
   id: string;
   fileName: string;
@@ -411,6 +431,13 @@ export interface BudgetQuote {
   status: BudgetQuoteStatus;
   /** @nullable */
   amount: number | null;
+  priceScope: string;
+  scopeType: BudgetQuoteScopeType;
+  vatIncluded: BudgetQuoteVatIncluded;
+  /** @nullable */
+  validityDate: string | null;
+  /** @nullable */
+  driveUrl: string | null;
   /** @nullable */
   buildingType: string | null;
   /** @nullable */
@@ -445,6 +472,24 @@ export const BudgetQuoteInputStatus = {
   rejected: 'rejected',
 } as const;
 
+export type BudgetQuoteInputScopeType = typeof BudgetQuoteInputScopeType[keyof typeof BudgetQuoteInputScopeType];
+
+
+export const BudgetQuoteInputScopeType = {
+  supplied: 'supplied',
+  installed: 'installed',
+  unknown: 'unknown',
+} as const;
+
+export type BudgetQuoteInputVatIncluded = typeof BudgetQuoteInputVatIncluded[keyof typeof BudgetQuoteInputVatIncluded];
+
+
+export const BudgetQuoteInputVatIncluded = {
+  yes: 'yes',
+  no: 'no',
+  unknown: 'unknown',
+} as const;
+
 export interface BudgetQuoteInput {
   /** @minLength 1 */
   fileName: string;
@@ -456,6 +501,13 @@ export interface BudgetQuoteInput {
   status: BudgetQuoteInputStatus;
   /** @nullable */
   amount?: number | null;
+  priceScope?: string;
+  scopeType?: BudgetQuoteInputScopeType;
+  vatIncluded?: BudgetQuoteInputVatIncluded;
+  /** @nullable */
+  validityDate?: string | null;
+  /** @nullable */
+  driveUrl?: string | null;
   /** @nullable */
   buildingType?: string | null;
   /** @nullable */
@@ -489,6 +541,24 @@ export const BudgetQuoteUpdateStatus = {
   rejected: 'rejected',
 } as const;
 
+export type BudgetQuoteUpdateScopeType = typeof BudgetQuoteUpdateScopeType[keyof typeof BudgetQuoteUpdateScopeType];
+
+
+export const BudgetQuoteUpdateScopeType = {
+  supplied: 'supplied',
+  installed: 'installed',
+  unknown: 'unknown',
+} as const;
+
+export type BudgetQuoteUpdateVatIncluded = typeof BudgetQuoteUpdateVatIncluded[keyof typeof BudgetQuoteUpdateVatIncluded];
+
+
+export const BudgetQuoteUpdateVatIncluded = {
+  yes: 'yes',
+  no: 'no',
+  unknown: 'unknown',
+} as const;
+
 export interface BudgetQuoteUpdate {
   /** @minLength 1 */
   fileName?: string;
@@ -500,6 +570,13 @@ export interface BudgetQuoteUpdate {
   status?: BudgetQuoteUpdateStatus;
   /** @nullable */
   amount?: number | null;
+  priceScope?: string;
+  scopeType?: BudgetQuoteUpdateScopeType;
+  vatIncluded?: BudgetQuoteUpdateVatIncluded;
+  /** @nullable */
+  validityDate?: string | null;
+  /** @nullable */
+  driveUrl?: string | null;
   /** @nullable */
   buildingType?: string | null;
   /** @nullable */
@@ -510,5 +587,25 @@ export interface BudgetQuoteUpdate {
   sourceFolderUrl?: string | null;
   /** @nullable */
   note?: string | null;
+}
+
+export interface BudgetQuoteLink {
+  id: string;
+  quoteId: string;
+  /** @nullable */
+  budgetLineCode: string | null;
+  /** @nullable */
+  extraId: string | null;
+}
+
+export interface BudgetQuoteLinkTarget {
+  /** @nullable */
+  budgetLineCode: string | null;
+  /** @nullable */
+  extraId: string | null;
+}
+
+export interface BudgetQuoteLinksUpdate {
+  links: BudgetQuoteLinkTarget[];
 }
 

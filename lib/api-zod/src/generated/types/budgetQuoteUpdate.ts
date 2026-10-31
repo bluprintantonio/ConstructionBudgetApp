@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BudgetQuoteUpdateDocumentType } from './budgetQuoteUpdateDocumentType';
+import type { BudgetQuoteUpdateScopeType } from './budgetQuoteUpdateScopeType';
 import type { BudgetQuoteUpdateStatus } from './budgetQuoteUpdateStatus';
+import type { BudgetQuoteUpdateVatIncluded } from './budgetQuoteUpdateVatIncluded';
 
 export interface BudgetQuoteUpdate {
   /** @minLength 1 */
@@ -19,6 +21,13 @@ export interface BudgetQuoteUpdate {
   status?: BudgetQuoteUpdateStatus;
   /** @nullable */
   amount?: number | null;
+  priceScope?: string;
+  scopeType?: BudgetQuoteUpdateScopeType;
+  vatIncluded?: BudgetQuoteUpdateVatIncluded;
+  /** @nullable */
+  validityDate?: string | null;
+  /** @nullable */
+  driveUrl?: string | null;
   /** @nullable */
   buildingType?: string | null;
   /** @nullable */
