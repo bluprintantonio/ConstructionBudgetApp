@@ -458,11 +458,12 @@ components:
         inPremium: { type: boolean }
         quantity: { type: integer }
         unit: { type: string }
+        priceScope: { type: string }
         unitPrice: { type: ["number", "null"] }
         priceStatus: { type: string, enum: [estimate, quoted, pending] }
         quoteId: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
-      required: [id, name, inEco, inPremium, quantity, unit, unitPrice, priceStatus, quoteId, notes]
+      required: [id, name, inEco, inPremium, quantity, unit, priceScope, unitPrice, priceStatus, quoteId, notes]
     BudgetExtraUpdate:
       type: object
       properties:

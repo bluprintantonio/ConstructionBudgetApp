@@ -35,6 +35,10 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Store all settings and scenarios in the database, never in the browser.
 - Keep one calculation engine in `/lib/engine`; UI, exports, and summaries must call it. Do not implement calculations elsewhere.
 
+## RULES
+
+- The whole app works per ONE house unit. The CSV totals, the extras and the Planner are all for one unit. Never multiply by two or split into pairs unless I ask.
+
 ## Product boundaries
 
 - Keep exactly these pages: Overview, Materials map, Quotes & documents, Sources.

@@ -384,7 +384,7 @@ function BudgetPage() {
     <section className="panel register-panel">
       <div className="register-toolbar"><strong>Extras</strong><span className="source-ref">Unit price is the total for one complete item.</span></div>
       {extrasQuery.isLoading ? <div className="table-footer">Loading extras…</div> : extrasQuery.isError ? <div className="inline-message"><AlertCircle size={15}/>Could not load extras.<button className="text-link" onClick={() => void extrasQuery.refetch()}>Retry</button></div> : <div className="table-scroll scrollbar-thin"><table className="data-table">
-        <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th/></tr></thead>
+        <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>PRICE SCOPE</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th/></tr></thead>
         <tbody>{(extrasQuery.data || []).map(extra => {
           const draft = draftForExtra(extra);
           return <tr key={extra.id} data-testid={`row-extra-${extra.id}`}>
@@ -392,6 +392,7 @@ function BudgetPage() {
             <td><div className="row-actions">{extra.inEco && <span className="pill" data-testid={`flag-extra-eco-${extra.id}`}><i/>Eco</span>}{extra.inPremium && <span className="pill" data-testid={`flag-extra-premium-${extra.id}`}><i/>Premium</span>}</div></td>
             <td><label className="form-field"><input aria-label={`${extra.name} quantity`} data-testid={`input-extra-quantity-${extra.id}`} type="number" min="0" step="1" value={draft.quantity} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { quantity: event.target.value })}/></label></td>
             <td data-testid={`text-extra-unit-${extra.id}`}>{extra.unit}</td>
+            <td data-testid={`text-extra-price-scope-${extra.id}`}>{extra.priceScope}</td>
             <td><label className="form-field"><input aria-label={`${extra.name} complete item price`} data-testid={`input-extra-unit-price-${extra.id}`} type="number" min="0" step="0.01" placeholder="—" value={draft.unitPrice} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { unitPrice: event.target.value })}/></label>{extra.unitPrice == null && !draft.unitPrice.trim() && <small className="source-ref" data-testid={`status-extra-price-pending-${extra.id}`}>Price pending</small>}</td>
             <td><label className="form-field"><select aria-label={`${extra.name} price status`} data-testid={`select-extra-status-${extra.id}`} value={draft.priceStatus} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { priceStatus: event.target.value as BudgetExtra['priceStatus'] })}>{(['estimate', 'quoted', 'pending'] as BudgetExtra['priceStatus'][]).map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></label></td>
             <td><label className="form-field"><input aria-label={`${extra.name} notes`} data-testid={`input-extra-notes-${extra.id}`} value={draft.notes} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { notes: event.target.value })}/></label></td>

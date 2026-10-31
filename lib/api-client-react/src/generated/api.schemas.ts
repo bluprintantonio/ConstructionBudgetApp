@@ -303,6 +303,7 @@ export interface BudgetExtra {
   inPremium: boolean;
   quantity: number;
   unit: string;
+  priceScope: string;
   /** @nullable */
   unitPrice: number | null;
   priceStatus: BudgetExtraPriceStatus;

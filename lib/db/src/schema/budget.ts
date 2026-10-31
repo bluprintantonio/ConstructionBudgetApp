@@ -113,6 +113,7 @@ export const extrasTable = pgTable("extras", {
   inPremium: boolean("in_premium").notNull(),
   quantity: integer("quantity").notNull().default(1),
   unit: text("unit").notNull(),
+  priceScope: text("price_scope").notNull().default("per house unit"),
   unitPrice: real("unit_price"),
   priceStatus: extraPriceStatusEnum("price_status").notNull().default("pending"),
   quoteId: text("quote_id").references(() => budgetQuotesTable.id),
