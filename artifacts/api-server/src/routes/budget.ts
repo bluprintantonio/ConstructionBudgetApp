@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { asc, eq, isNotNull, like } from "drizzle-orm";
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { calculatePackTotals } from "@workspace/engine/packs";
 import {
   db,
   budgetLinesTable,
@@ -377,29 +378,42 @@ function quoteValues(
 }
 
 router.get("/budget/dashboard", async (_req, res): Promise<void> => {
-  await ensureSeedData();
-  const [lines, quotes] = await Promise.all([
+  await Promise.all([ensureSeedData(), ensureExtrasSeedData()]);
+  const [lines, extras, quotes] = await Promise.all([
     db.select().from(budgetLinesTable),
+    db.select().from(extrasTable),
     db.select().from(budgetQuotesTable),
   ]);
-  const sum = (
-    field: "ecoTotal" | "standardTotal" | "premiumTotal",
-  ) => lines.reduce((total, line) => total + (line[field] ?? 0), 0);
+  const packs = calculatePackTotals(lines, extras);
   res.json(
     GetBudgetDashboardResponse.parse({
       sourceMetrics: [
-        { id: "eco", label: "Eco", value: sum("ecoTotal"), sourceColumn: "Total Eco" },
+        {
+          id: "eco",
+          label: "Eco",
+          value: packs.eco.total,
+          sourceColumn: "Standard unit price + extras",
+          fromCsvLines: packs.eco.fromCsvLines,
+          fromExtras: packs.eco.fromExtras,
+          pendingExtraCount: packs.eco.pendingExtraCount,
+        },
         {
           id: "standard",
           label: "Standard",
-          value: sum("standardTotal"),
-          sourceColumn: "Total Std",
+          value: packs.standard.total,
+          sourceColumn: "Standard unit price",
+          fromCsvLines: packs.standard.fromCsvLines,
+          fromExtras: packs.standard.fromExtras,
+          pendingExtraCount: packs.standard.pendingExtraCount,
         },
         {
           id: "premium",
           label: "Premium",
-          value: sum("premiumTotal"),
-          sourceColumn: "Total Premium",
+          value: packs.premium.total,
+          sourceColumn: "Premium unit price + extras",
+          fromCsvLines: packs.premium.fromCsvLines,
+          fromExtras: packs.premium.fromExtras,
+          pendingExtraCount: packs.premium.pendingExtraCount,
         },
       ],
       lineCount: lines.length,

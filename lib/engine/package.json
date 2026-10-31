@@ -1,0 +1,12 @@
+{
+  "name": "@workspace/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./packs": "./packs/index.ts"
+  },
+  "scripts": {
+    "test": "node --test tests/packs.test.mjs"
+  }
+}

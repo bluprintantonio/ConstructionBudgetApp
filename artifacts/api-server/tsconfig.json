@@ -10,6 +10,9 @@
   "include": ["src"],
   "references": [
     {
+      "path": "../../lib/engine"
+    },
+    {
       "path": "../../lib/db"
     },
     {

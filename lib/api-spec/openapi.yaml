@@ -349,7 +349,10 @@ components:
         label: { type: string }
         value: { type: number }
         sourceColumn: { type: string }
-      required: [id, label, value, sourceColumn]
+        fromCsvLines: { type: number }
+        fromExtras: { type: number }
+        pendingExtraCount: { type: integer }
+      required: [id, label, value, sourceColumn, fromCsvLines, fromExtras, pendingExtraCount]
     BudgetDashboard:
       type: object
       properties:

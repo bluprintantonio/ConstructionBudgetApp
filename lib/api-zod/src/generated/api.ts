@@ -25,7 +25,10 @@ export const GetBudgetDashboardResponse = zod.object({
   "id": zod.string(),
   "label": zod.string(),
   "value": zod.number(),
-  "sourceColumn": zod.string()
+  "sourceColumn": zod.string(),
+  "fromCsvLines": zod.number(),
+  "fromExtras": zod.number(),
+  "pendingExtraCount": zod.number().int()
 })),
   "lineCount": zod.number().int(),
   "quoteCount": zod.number().int(),

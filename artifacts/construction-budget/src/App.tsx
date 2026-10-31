@@ -20,6 +20,7 @@ import {
   getGetBudgetExtrasQueryKey,
   getGetBudgetQuotesQueryKey
 } from '@workspace/api-client-react';
+import { calculatePackTotals } from '@workspace/engine/packs';
 
 const queryClient = new QueryClient();
 const quoteStatuses = Object.values(BudgetQuoteStatus);
@@ -151,7 +152,8 @@ function parseBudgetCsv(input: string): BudgetLineInput[] {
   });
 }
 
-function downloadBudgetCsv(lines: BudgetLine[]) {
+function downloadBudgetCsv(lines: BudgetLine[], extras: BudgetExtra[]) {
+  const packTotals = calculatePackTotals(lines, extras);
   const columns: [string, keyof BudgetLine][] = [
     ['Código', 'code'], ['Capítulo', 'category'], ['Descrição', 'item'], ['Und.', 'unit'],
     ['Quant.', 'quantity'], ['Preço Std', 'standardUnitPrice'], ['Total Std', 'standardTotal'],
@@ -162,7 +164,21 @@ function downloadBudgetCsv(lines: BudgetLine[]) {
     const text = value == null ? '' : String(value);
     return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   };
-  const csv = [columns.map(([label]) => escape(label)).join(';'), ...lines.map(line => columns.map(([, key]) => escape(line[key])).join(';'))].join('\r\n');
+  const rows: unknown[][] = [
+    columns.map(([label]) => label),
+    ...lines.map(line => columns.map(([, key]) => line[key])),
+    [],
+    ['Pack totals per one house unit'],
+    ['Pack', 'Total', 'From CSV lines', 'From extras', 'Extras pending a price'],
+  ];
+  for (const [label, pack] of [
+    ['Standard', packTotals.standard],
+    ['Eco', packTotals.eco],
+    ['Premium', packTotals.premium],
+  ] as const) {
+    rows.push([label, pack.total, pack.fromCsvLines, pack.fromExtras, pack.pendingExtraCount]);
+  }
+  const csv = rows.map(row => row.map(escape).join(';')).join('\r\n');
   const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = href;
@@ -225,11 +241,13 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <div className="page-heading fade-up"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action}</div>;
 }
 
-function MetricTile({ label, value, sourceColumn, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
+function MetricTile({ label, value, sourceColumn, fromCsvLines, fromExtras, pendingExtraCount, icon: Icon, index, currencyCode }: { label: string; value: number; sourceColumn: string; fromCsvLines: number; fromExtras: number; pendingExtraCount: number; icon: typeof Activity; index: number; currencyCode: CurrencyCode }) {
   return <article className="metric-tile fade-up" style={{ animationDelay: `${index * 60}ms` }}>
     <div className="metric-top"><span className="metric-icon"><Icon size={17}/></span><span className="source-col">{sourceColumn}</span></div>
     <div className="metric-value">{currency(value, currencyCode)}</div><div className="metric-label">{label}</div>
-    <div className="metric-foot"><span>Sum of master CSV totals</span><ArrowUpRight size={14}/></div>
+    <div className="metric-foot"><span>CSV lines + extras</span><ArrowUpRight size={14}/></div>
+    <div className="metric-label">From CSV lines: {currency(fromCsvLines, currencyCode)} · from extras: {currency(fromExtras, currencyCode)}</div>
+    {pendingExtraCount > 0 && <div className="metric-label">{pendingExtraCount} {pendingExtraCount === 1 ? 'extra' : 'extras'} pending a price</div>}
   </article>;
 }
 
@@ -265,7 +283,7 @@ function Overview() {
       </div>
       <div className="welcome-art" aria-hidden="true"><div className="art-grid"/><div className="blueprint"><div className="bp-topline"/><div className="bp-room bp-a"/><div className="bp-room bp-b"/><div className="bp-room bp-c"/><div className="bp-room bp-d"/><div className="bp-label">GROUND FLOOR / 01</div><div className="bp-dimension">NTS</div></div><div className="art-stamp">H<br/><span>PLAN SET</span></div><div className="art-coordinate">REFERENCE / A-01<br/>PROJECT DRAWING</div></div>
     </section>
-    <div className="section-heading"><div><div className="eyebrow">MASTER CSV / SCENARIO TOTALS</div><h2>Estimate totals by tier</h2><p className="currency-assumption">Display currency: {currencyCode} (assumed; the CSV has no currency field).</p></div><div className="section-meta"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/>{health.data?.status === 'ok' ? 'App online' : 'Master map'}</div></div>
+    <div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK TOTALS</div><h2>Estimate totals by tier</h2><p className="currency-assumption">Display currency: {currencyCode} (assumed; the CSV has no currency field).</p></div><div className="section-meta"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/>{health.data?.status === 'ok' ? 'App online' : 'Master map'}</div></div>
     {metrics.length ? <div className="metrics-grid">{metrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div> : <div className="metric-placeholder"><FileSpreadsheet size={19}/><span>Master map totals will appear here when available.</span></div>}
     <div className="dashboard-lower">
       <section className="panel recent-panel"><div className="panel-head"><div><div className="eyebrow">MASTER MATERIAL MAP</div><h2>First coded items</h2></div><Link href="/budget" className="text-link">View all <ArrowRight size={14}/></Link></div>
@@ -280,7 +298,7 @@ function Overview() {
         <div className="project-link"><div className="project-link-icon"><BookOpen size={16}/></div><div><small>BUILDING REFERENCES</small><strong>{projects.data?.length ?? 0} linked building types</strong></div><Link href="/sources" aria-label="View source references"><ArrowUpRight size={15}/></Link></div>
       </aside>
     </div>
-    <div className="data-footnote"><ShieldCheck size={14}/> Tier totals sum the CSV totals exactly. Currency is assumed for display and is not stated in the source.</div>
+    <div className="data-footnote"><ShieldCheck size={14}/> Pack totals are for one house unit. Blank or pending extra prices contribute 0. Currency is assumed for display and is not stated in the source.</div>
   </div>;
 }
 
@@ -322,6 +340,7 @@ function BudgetPage() {
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
   const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
   const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
+  const packMetrics = dashboard.data?.sourceMetrics || [];
   const reload = () => { void query.refetch(); void dashboard.refetch(); };
   const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
   const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
@@ -370,8 +389,9 @@ function BudgetPage() {
   const importRows = (e: FormEvent) => { e.preventDefault(); try { const parsed = parseBudgetCsv(importText); importer.mutate({ data: parsed }, { onSuccess: () => { setImportOpen(false); setImportText(''); setMessage('Master rows imported.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); }, onError: () => setMessage('The CSV could not be imported. Check the master headers and try again.') }); } catch (error) { setMessage(error instanceof Error ? error.message : 'CSV could not be read.'); } };
   if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
-    <PageHeader eyebrow="WORKSPACE / MASTER MAP" title="Materials & quantities" description="Coded items from the master CSV, with Eco, Standard, and Premium price tiers." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines)} disabled={!lines.length}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div>}/>
+     <PageHeader eyebrow="WORKSPACE / MASTER MAP" title="Materials & quantities" description="Coded items from the master CSV, with Eco, Standard, and Premium price tiers." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines, extrasQuery.data || [])} disabled={!lines.length || extrasQuery.isLoading || extrasQuery.isError}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div>}/>
     <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
+     {packMetrics.length > 0 && <><div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2>Pack totals</h2></div></div><div className="metrics-grid">{packMetrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div></>}
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
     <section className="panel register-panel">
       <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>

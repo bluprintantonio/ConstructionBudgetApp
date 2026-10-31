@@ -184,6 +184,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/engine':
+        specifier: workspace:*
+        version: link:../../lib/engine
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -229,6 +232,10 @@ importers:
         version: 3.1.0
 
   artifacts/construction-budget:
+    dependencies:
+      '@workspace/engine':
+        specifier: workspace:*
+        version: link:../../lib/engine
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -645,6 +652,8 @@ importers:
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
+
+  lib/engine: {}
 
   scripts:
     devDependencies:

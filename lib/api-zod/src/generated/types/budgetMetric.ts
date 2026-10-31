@@ -11,4 +11,7 @@ export interface BudgetMetric {
   label: string;
   value: number;
   sourceColumn: string;
+  fromCsvLines: number;
+  fromExtras: number;
+  pendingExtraCount: number;
 }
