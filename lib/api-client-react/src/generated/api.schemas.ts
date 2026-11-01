@@ -169,6 +169,37 @@ export interface HouseType {
   costBasis: string;
 }
 
+export type CapChapterKind = typeof CapChapterKind[keyof typeof CapChapterKind];
+
+
+export const CapChapterKind = {
+  original: 'original',
+  added: 'added',
+} as const;
+
+export interface CapChapter {
+  code: string;
+  name: string;
+  sortOrder: number;
+  kind: CapChapterKind;
+  /** @nullable */
+  specReference: string | null;
+}
+
+export interface LineChapterOverride {
+  budgetLineCode: string;
+  chapterCode: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface LineChapterOverrideInput {
+  /** @minLength 1 */
+  chapterCode: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
 export type BudgetLineStatus = typeof BudgetLineStatus[keyof typeof BudgetLineStatus];
 
 

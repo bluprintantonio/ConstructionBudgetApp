@@ -1,4 +1,5 @@
 export * from "./budget";
+export * from "./cap-chapters";
 
 // Export your models here. Add one export per file
 // export * from "./posts";

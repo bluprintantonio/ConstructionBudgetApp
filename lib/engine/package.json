@@ -6,7 +6,8 @@
   "exports": {
     "./packs": "./packs/index.ts",
     "./planner": "./planner/index.ts",
-    "./quotes": "./quotes/index.ts"
+    "./quotes": "./quotes/index.ts",
+    "./chapters": "./chapters/index.ts"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs"

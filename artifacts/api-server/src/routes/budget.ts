@@ -7,9 +7,11 @@ import {
   budgetLinesTable,
   budgetMetaTable,
   budgetQuotesTable,
+  capChaptersTable,
   extrasTable,
   houseTypesTable,
   lineMarkersTable,
+  lineChapterOverridesTable,
   plannerInputsTable,
   quoteLinksTable,
   sourcesTable,
@@ -30,6 +32,8 @@ import {
   GetBudgetQuoteLinksResponse,
   GetBudgetQuotesResponse,
   GetBudgetSourcesResponse,
+  GetCapChaptersResponse,
+  GetLineChapterOverridesResponse,
   GetPlannerHouseTypesResponse,
   GetPlannerInputsResponse,
   ImportBudgetLinesBody,
@@ -54,6 +58,10 @@ import {
   UpdateBudgetLineMarkerParams,
   UpdateBudgetLineMarkerBody,
   UpdateBudgetLineMarkerResponse,
+  DeleteLineChapterOverrideParams,
+  UpsertLineChapterOverrideBody,
+  UpsertLineChapterOverrideParams,
+  UpsertLineChapterOverrideResponse,
 } from "@workspace/api-zod";
 import {
   buildingTypes,
@@ -745,6 +753,115 @@ router.post(
         ),
       );
     }
+  },
+);
+
+router.get("/budget/cap-chapters", async (_req, res): Promise<void> => {
+  const chapters = await db
+    .select()
+    .from(capChaptersTable)
+    .orderBy(asc(capChaptersTable.sortOrder));
+  res.json(GetCapChaptersResponse.parse(chapters));
+});
+
+router.get(
+  "/budget/line-chapter-overrides",
+  async (_req, res): Promise<void> => {
+    const overrides = await db
+      .select()
+      .from(lineChapterOverridesTable)
+      .orderBy(asc(lineChapterOverridesTable.budgetLineCode));
+    res.json(
+      GetLineChapterOverridesResponse.parse(
+        overrides.map((override) => ({
+          ...override,
+          createdAt: override.createdAt.toISOString(),
+        })),
+      ),
+    );
+  },
+);
+
+router.put(
+  "/budget/line-chapter-overrides/:budgetLineCode",
+  async (req, res): Promise<void> => {
+    const params = UpsertLineChapterOverrideParams.safeParse(req.params);
+    const parsed = UpsertLineChapterOverrideBody.safeParse(req.body);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    if (!parsed.success || !parsed.data.reason.trim()) {
+      res.status(400).json({
+        error: parsed.success
+          ? "A reason is required for a chapter override."
+          : parsed.error.message,
+      });
+      return;
+    }
+
+    const [line] = await db
+      .select({ code: budgetLinesTable.code })
+      .from(budgetLinesTable)
+      .where(eq(budgetLinesTable.code, params.data.budgetLineCode))
+      .limit(1);
+    if (!line) {
+      res.status(404).json({ error: "Budget line not found." });
+      return;
+    }
+
+    const [chapter] = await db
+      .select({ code: capChaptersTable.code })
+      .from(capChaptersTable)
+      .where(eq(capChaptersTable.code, parsed.data.chapterCode))
+      .limit(1);
+    if (!chapter) {
+      res.status(404).json({ error: "CAP chapter not found." });
+      return;
+    }
+
+    const [override] = await db
+      .insert(lineChapterOverridesTable)
+      .values({
+        budgetLineCode: params.data.budgetLineCode,
+        chapterCode: parsed.data.chapterCode,
+        reason: parsed.data.reason.trim(),
+      })
+      .onConflictDoUpdate({
+        target: lineChapterOverridesTable.budgetLineCode,
+        set: {
+          chapterCode: parsed.data.chapterCode,
+          reason: parsed.data.reason.trim(),
+        },
+      })
+      .returning();
+
+    res.json(
+      UpsertLineChapterOverrideResponse.parse({
+        ...override,
+        createdAt: override.createdAt.toISOString(),
+      }),
+    );
+  },
+);
+
+router.delete(
+  "/budget/line-chapter-overrides/:budgetLineCode",
+  async (req, res): Promise<void> => {
+    const params = DeleteLineChapterOverrideParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    await db
+      .delete(lineChapterOverridesTable)
+      .where(
+        eq(
+          lineChapterOverridesTable.budgetLineCode,
+          params.data.budgetLineCode,
+        ),
+      );
+    res.sendStatus(204);
   },
 );
 

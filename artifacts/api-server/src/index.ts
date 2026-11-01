@@ -2,12 +2,19 @@ import app from "./app";
 import { and, isNotNull, isNull, sql } from "drizzle-orm";
 import {
   budgetQuotesTable,
+  budgetMetaTable,
+  capChaptersTable,
   db,
   houseTypesTable,
+  lineChapterOverridesTable,
   plannerInputsTable,
 } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { plannerHouseTypeSeedRows } from "./lib/budget-seed";
+import {
+  capChapterSeedRows,
+  lineChapterOverrideSeedRows,
+} from "./lib/chapter-seed";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +31,25 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function startServer(): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [newSeedMarker] = await tx
+      .insert(budgetMetaTable)
+      .values({ id: "cap-chapters-v1" })
+      .onConflictDoNothing()
+      .returning({ id: budgetMetaTable.id });
+
+    if (newSeedMarker) {
+      await tx
+        .insert(capChaptersTable)
+        .values(capChapterSeedRows)
+        .onConflictDoNothing();
+      await tx
+        .insert(lineChapterOverridesTable)
+        .values(lineChapterOverrideSeedRows)
+        .onConflictDoNothing();
+    }
+  });
+
   await db
     .insert(houseTypesTable)
     .values([...plannerHouseTypeSeedRows])

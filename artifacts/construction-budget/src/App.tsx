@@ -15,14 +15,17 @@ import {
   useCheckBudgetSourceConnection,
   useGetBudgetExtras, useUpdateBudgetExtra,
   useGetBudgetLines, useGetBudgetQuotes, useGetBudgetQuoteLinks, useUpdateBudgetQuoteLinks,
+  useGetCapChapters, useGetLineChapterOverrides, useUpsertLineChapterOverride, useDeleteLineChapterOverride,
   useCreateBudgetLine, useImportBudgetLines,
   useUpdateBudgetLine, useDeleteBudgetLine, useCreateBudgetQuote, useUpdateBudgetQuote,
   useUpdateBudgetLineMarker,
   useDeleteBudgetQuote, getGetBudgetDashboardQueryKey, getGetBudgetLinesQueryKey,
   getGetBudgetExtrasQueryKey,
-  getGetBudgetQuotesQueryKey, getGetBudgetQuoteLinksQueryKey
+  getGetBudgetQuotesQueryKey, getGetBudgetQuoteLinksQueryKey,
+  getGetLineChapterOverridesQueryKey
 } from '@workspace/api-client-react';
 import { calculatePackTotals } from '@workspace/engine/packs';
+import { calculateChapterGroups, getEffectiveChapter } from '@workspace/engine/chapters';
 import { calculateQuoteComparisons, type QuoteWarnings } from '@workspace/engine/quotes';
 import PlannerPage from './pages/planner';
 import { branding } from './config/branding';
@@ -387,6 +390,10 @@ function BudgetPage() {
   const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
   const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
   const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
+  const capChaptersQuery = useGetCapChapters();
+  const chapterOverridesQuery = useGetLineChapterOverrides();
+  const saveChapterOverride = useUpsertLineChapterOverride();
+  const removeChapterOverride = useDeleteLineChapterOverride();
   const { currencyCode } = useCurrency();
   const [, setLocation] = useLocation();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
@@ -394,6 +401,11 @@ function BudgetPage() {
   const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
   const [extraDrafts, setExtraDrafts] = useState<Record<string, ExtraDraft>>({});
    const [collapsedChapters, setCollapsedChapters] = useState<Set<string> | null>(null);
+  const [chapterOverrideDraft, setChapterOverrideDraft] = useState<{
+    line: BudgetLine;
+    chapterCode: string;
+    reason: string;
+  } | null>(null);
   const [selectedPack, setSelectedPack] = useState<PackId>(readPackFromUrl);
    const [openBoard, setOpenBoard] = useState<MaterialsBoardId | null>(readBoardFromUrl);
   useEffect(() => {
@@ -414,36 +426,62 @@ function BudgetPage() {
     localDateString(),
   ), [quotesQuery.data, quoteLinksQuery.data, lines]);
   const quotesById = new Map((quotesQuery.data || []).map(quote => [quote.id, quote]));
-  const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
-  const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
+  const chapters = useMemo(
+    () => [...(capChaptersQuery.data || [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [capChaptersQuery.data],
+  );
+  const chapterOverrides = chapterOverridesQuery.data || [];
+  const chapterOverridesByCode = useMemo(
+    () => new Map(chapterOverrides.map(override => [override.budgetLineCode, override])),
+    [chapterOverrides],
+  );
+  const effectiveChapterByLineId = useMemo(
+    () => new Map(lines.map(line => [line.id, getEffectiveChapter(line, chapters, chapterOverrides)])),
+    [lines, chapters, chapterOverrides],
+  );
+  const filtered = useMemo(() => lines.filter(line => {
+    const effective = effectiveChapterByLineId.get(line.id);
+    const matchesChapter = chapterFilter === 'all' || effective?.code === chapterFilter;
+    const searchable = `${line.code || ''} ${line.category} ${effective?.code || ''} ${effective?.name || ''} ${line.item} ${line.unit || ''}`;
+    return matchesChapter && searchable.toLowerCase().includes(search.toLowerCase());
+  }), [lines, chapterFilter, effectiveChapterByLineId, search]);
   const packTotals = useMemo(
     () => query.data && extrasQuery.data ? calculatePackTotals(query.data, extrasQuery.data) : null,
     [query.data, extrasQuery.data],
   );
-  const chapterGroups = useMemo(() => {
-    const grouped = new Map<string, BudgetLine[]>();
-    filtered.forEach(line => grouped.set(line.category, [...(grouped.get(line.category) || []), line]));
-    return [...grouped.entries()].map(([name, chapterLines]) => {
-      const match = name.match(/^(CAP\.\s*\d+)\s*(.*)$/i);
-      const totals = calculatePackTotals(chapterLines, []);
-      return {
-        name,
-        code: match?.[1] || name,
-        title: match?.[2] || '',
-        lines: chapterLines,
-        total: totals[selectedPack].total,
-      };
-    });
-  }, [filtered, selectedPack]);
+  const chapterGroups = useMemo(
+    () => calculateChapterGroups(
+      filtered,
+      chapters,
+      chapterOverrides,
+      !search.trim(),
+    ).filter(group => chapterFilter === 'all' || group.code === chapterFilter),
+    [filtered, chapters, chapterOverrides, search, chapterFilter],
+  );
   const premiumReconciliation = useMemo(
     () => calculatePackTotals(lines, []).premiumReconciliation,
     [lines],
+  );
+  const premiumReconciliationLines = useMemo(
+    () => premiumReconciliation.commonUpliftLines.map(line => {
+      const budgetLine = lines.find(candidate => candidate.code === line.code);
+      const effectiveChapter = budgetLine
+        ? effectiveChapterByLineId.get(budgetLine.id)
+        : undefined;
+      return {
+        ...line,
+        effectiveChapter: effectiveChapter
+          ? `${effectiveChapter.code} ${effectiveChapter.name}`
+          : '—',
+      };
+    }),
+    [premiumReconciliation, lines, effectiveChapterByLineId],
   );
    const extras = extrasQuery.data || [];
    const pendingExtrasCount = extras.filter(extra => extra.unitPrice == null).length;
    const selectedPackExtrasTotal = packTotals?.[selectedPack]?.fromExtras ?? null;
    const houseItemCount = dashboard.data?.lineCount ?? lines.length;
-  const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); };
+  const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); void capChaptersQuery.refetch(); void chapterOverridesQuery.refetch(); };
   const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
   const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
     ...current,
@@ -485,6 +523,55 @@ function BudgetPage() {
       },
     );
   };
+  const openChapterEditor = (line: BudgetLine) => {
+    const override = line.code ? chapterOverridesByCode.get(line.code) : undefined;
+    const effective = effectiveChapterByLineId.get(line.id);
+    setChapterOverrideDraft({
+      line,
+      chapterCode: override?.chapterCode ?? effective?.code ?? '',
+      reason: override?.reason ?? '',
+    });
+  };
+  const saveChapterOverrideDraft = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!chapterOverrideDraft?.line.code) return;
+    const reason = chapterOverrideDraft.reason.trim();
+    if (!reason) {
+      setMessage('A reason is required for a chapter override.');
+      return;
+    }
+    saveChapterOverride.mutate(
+      {
+        budgetLineCode: chapterOverrideDraft.line.code,
+        data: {
+          chapterCode: chapterOverrideDraft.chapterCode,
+          reason,
+        },
+      },
+      {
+        onSuccess: () => {
+          setMessage(`${chapterOverrideDraft.line.code} chapter override saved.`);
+          setChapterOverrideDraft(null);
+          void client.invalidateQueries({ queryKey: getGetLineChapterOverridesQueryKey() });
+        },
+        onError: () => setMessage(`Could not save the chapter override for ${chapterOverrideDraft.line.code}.`),
+      },
+    );
+  };
+  const removeChapterOverrideForLine = () => {
+    if (!chapterOverrideDraft?.line.code) return;
+    removeChapterOverride.mutate(
+      { budgetLineCode: chapterOverrideDraft.line.code },
+      {
+        onSuccess: () => {
+          setMessage(`${chapterOverrideDraft.line.code} now uses its source CSV chapter.`);
+          setChapterOverrideDraft(null);
+          void client.invalidateQueries({ queryKey: getGetLineChapterOverridesQueryKey() });
+        },
+        onError: () => setMessage(`Could not remove the chapter override for ${chapterOverrideDraft.line.code}.`),
+      },
+    );
+  };
   const useQuotePrice = (extra: BudgetExtra, quote: BudgetQuote) => {
     if (quote.amount == null) return;
     updateExtra.mutate({
@@ -519,7 +606,7 @@ function BudgetPage() {
   const confirmDelete = (line: BudgetLine) => { if (window.confirm(`Remove “${line.item}” from the app's material map? The Drive source will not be changed.`)) remove.mutate({ lineId: line.id }, { onSuccess: () => { setMessage('Material removed from the app.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); } }); };
   const importRows = (e: FormEvent) => { e.preventDefault(); try { const parsed = parseBudgetCsv(importText); importer.mutate({ data: parsed }, { onSuccess: () => { setImportOpen(false); setImportText(''); setMessage('Master rows imported.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); }, onError: () => setMessage('The CSV could not be imported. Check the master headers and try again.') }); } catch (error) { setMessage(error instanceof Error ? error.message : 'CSV could not be read.'); } };
   const toggleChapter = (chapter: string) => setCollapsedChapters(current => {
-     const next = current === null ? new Set(chapters) : new Set(current);
+      const next = current === null ? new Set(chapters.map(item => item.code)) : new Set(current);
      if (current === null || !next.has(chapter)) next.delete(chapter);
     else next.add(chapter);
     return next;
@@ -542,10 +629,16 @@ function BudgetPage() {
   const renderLineRow = (line: BudgetLine) => {
     const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
     const marker = line.marker || 'common';
+    const effectiveChapter = effectiveChapterByLineId.get(line.id);
+    const chapterOverride = line.code ? chapterOverridesByCode.get(line.code) : undefined;
     return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
       <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
       <td className="marker-cell"><span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label></td>
-      <td className="material-chapter">{line.category}</td>
+      <td className="material-chapter">
+        <span>{effectiveChapter ? `${effectiveChapter.code} ${effectiveChapter.name}` : line.category}</span>
+        {chapterOverride && <small className="chapter-override-tag" title={chapterOverride.reason}>moved from {effectiveChapter?.sourceChapterCode || 'source chapter'} · {chapterOverride.reason}</small>}
+        <button className="chapter-override-button" type="button" disabled={!line.code} onClick={() => openChapterEditor(line)}>{chapterOverride ? 'Change' : 'Move'}</button>
+      </td>
       <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
         const quote = quotesById.get(comparison.quoteId);
         if (!quote) return null;
@@ -566,7 +659,8 @@ function BudgetPage() {
       <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
     </tr>;
   };
-  if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
+  if (query.isLoading || capChaptersQuery.isLoading || chapterOverridesQuery.isLoading) return <LoadingBlock/>;
+  if (query.isError || capChaptersQuery.isError || chapterOverridesQuery.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
       <section className="materials-hero">
         <div className="materials-hero-copy"><div className="eyebrow">WORKSPACE / MASTER MAP</div><h1>Materials &amp; quantities</h1><p>Source quantities and pack pricing, organized by chapter.</p></div>
@@ -675,10 +769,11 @@ function BudgetPage() {
               <div className="reconciliation-stat"><strong>{currency(premiumReconciliation.premiumLinesUsedByApp, currencyCode)}</strong><span>Premium lines used by the app (plus extras)</span></div>
             </div>
             <div className="table-scroll scrollbar-thin"><table className="data-table budget-table">
-              <thead><tr><th>CODE</th><th>DESCRIPTION</th><th>QTY</th><th>STANDARD PRICE</th><th>PREMIUM PRICE</th><th>DIFFERENCE</th></tr></thead>
-              <tbody>{premiumReconciliation.commonUpliftLines.map((line, index) => <tr key={line.code || `${line.description}-${index}`}>
+              <thead><tr><th>CODE</th><th>DESCRIPTION</th><th>CHAPTER</th><th>QTY</th><th>STANDARD PRICE</th><th>PREMIUM PRICE</th><th>DIFFERENCE</th></tr></thead>
+              <tbody>{premiumReconciliationLines.map((line, index) => <tr key={line.code || `${line.description}-${index}`}>
                 <td><span className="material-code">{line.code || '—'}</span></td>
                 <td>{line.description}</td>
+                <td>{line.effectiveChapter}</td>
                 <td className="money-cell">{line.quantity}</td>
                 <td className="money-cell">{currency(line.standardUnitPrice, currencyCode)}</td>
                 <td className="money-cell">{currency(line.premiumUnitPrice, currencyCode)}</td>
@@ -696,10 +791,10 @@ function BudgetPage() {
             <div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div>
             <div className="chapter-bulk-actions">
               <button className="button button-secondary chapter-bulk-button" type="button" onClick={() => setCollapsedChapters(new Set())}>Expand all</button>
-              <button className="button button-secondary chapter-bulk-button" type="button" onClick={() => setCollapsedChapters(new Set(chapters))}>Collapse all</button>
+              <button className="button button-secondary chapter-bulk-button" type="button" onClick={() => setCollapsedChapters(new Set(chapters.map(chapter => chapter.code)))}>Collapse all</button>
             </div>
           </div>
-          <div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div>
+          <div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter.code} key={chapter.code}>{chapter.code} {chapter.name}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div>
         </div>
         <div className="table-footer materials-count">
           <span className="materials-count-primary">Showing {filtered.length} of {lines.length} materials<span className="materials-count-source"><span className="footer-dot"/>Master source retained</span></span>
@@ -707,15 +802,23 @@ function BudgetPage() {
         </div>
        <div className="chapter-list">
          {chapterGroups.map(group => {
-            const collapsed = collapsedChapters === null || collapsedChapters.has(group.name);
-           return <article className="chapter-card" key={group.name} data-testid={`card-material-chapter-${group.code.replaceAll(' ', '-').toLowerCase()}`}>
-             <button className="chapter-card-header" type="button" aria-expanded={!collapsed} onClick={() => toggleChapter(group.name)}>
-               <span className={`chapter-chevron${collapsed ? '' : ' is-open'}`}><ChevronRight size={17}/></span>
-               <span className="chapter-title"><strong>{group.code}</strong><span>{group.title}</span></span>
-               <span className="chapter-count">{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'}</span>
-               <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.total, currencyCode)}</strong></span>
-             </button>
-             {!collapsed && <div className="table-scroll scrollbar-thin">
+             const empty = group.lines.length === 0;
+             const collapsed = empty || collapsedChapters === null || collapsedChapters.has(group.code);
+            return <article className={`chapter-card${empty ? ' is-empty' : ''}`} key={group.code} data-testid={`card-material-chapter-${group.code.replaceAll(' ', '-').toLowerCase()}`}>
+              {empty
+                ? <div className="chapter-card-header chapter-card-header-empty">
+                    <span className="chapter-chevron"><ChevronRight size={17}/></span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
+                    <span className="chapter-empty-label">no lines yet</span>
+                    <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
+                  </div>
+                : <button className="chapter-card-header" type="button" aria-expanded={!collapsed} onClick={() => toggleChapter(group.code)}>
+                    <span className={`chapter-chevron${collapsed ? '' : ' is-open'}`}><ChevronRight size={17}/></span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
+                    <span className="chapter-count">{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'}</span>
+                    <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
+                  </button>}
+              {!collapsed && <div className="table-scroll scrollbar-thin">
                <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div>
                <table className="data-table budget-table materials-table" data-selected-pack={selectedPack}>
                  <thead><tr><th>CODE</th><th>MARKER</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th data-pack-price="eco">ECO</th><th data-pack-price="standard">STANDARD</th><th data-pack-price="premium">PREMIUM</th><th/></tr></thead>
@@ -743,6 +846,28 @@ function BudgetPage() {
     <Dialog open={importOpen} title="Import master quantity CSV" subtitle="Uses the source file's semicolon delimiter and Portuguese column headings." onClose={() => setImportOpen(false)}>
       <form onSubmit={importRows} className="import-form"><Field label="Choose CSV file" wide><input type="file" accept=".csv,text/csv" data-testid="input-budget-csv" onChange={event => { const file = event.target.files?.[0]; if (file) void file.text().then(setImportText).catch(() => setMessage('Could not read that file.')); }}/></Field><Field label="Or paste CSV rows" wide><textarea rows={8} value={importText} onChange={e => setImportText(e.target.value)} placeholder="Código;Capítulo;Descrição;Und.;Quant.;Preço Std;Total Std;Preço Eco;Total Eco;Preço Premium;Total Premium"/></Field><div className="import-tip"><FileSpreadsheet size={15}/> Existing codes are intended to update the corresponding material row.</div><FormActions onCancel={() => setImportOpen(false)} pending={importer.isPending} label="Import materials"/></form>
     </Dialog>
+     <Dialog
+       open={!!chapterOverrideDraft}
+       title={chapterOverrideDraft ? `Chapter for ${chapterOverrideDraft.line.code || chapterOverrideDraft.line.item}` : 'Chapter override'}
+       subtitle="The CSV chapter stays unchanged. This override changes only the effective Materials map grouping."
+       onClose={() => setChapterOverrideDraft(null)}
+     >
+       {chapterOverrideDraft && <form className="form-grid" onSubmit={saveChapterOverrideDraft}>
+         <Field label="Effective chapter" wide>
+           <select required value={chapterOverrideDraft.chapterCode} onChange={event => setChapterOverrideDraft(current => current ? { ...current, chapterCode: event.target.value } : current)}>
+             {chapters.map(chapter => <option key={chapter.code} value={chapter.code}>{chapter.code} {chapter.name}</option>)}
+           </select>
+         </Field>
+         <Field label="Reason (required)" wide>
+           <textarea required rows={3} value={chapterOverrideDraft.reason} onChange={event => setChapterOverrideDraft(current => current ? { ...current, reason: event.target.value } : current)} placeholder="Why does this line belong in the selected chapter?"/>
+         </Field>
+         <div className="form-actions chapter-override-actions">
+           {chapterOverridesByCode.has(chapterOverrideDraft.line.code || '') && <button className="button button-secondary" type="button" onClick={removeChapterOverrideForLine} disabled={removeChapterOverride.isPending || saveChapterOverride.isPending}>Remove override</button>}
+           <button className="button button-secondary" type="button" onClick={() => setChapterOverrideDraft(null)}>Cancel</button>
+           <button className="button button-primary" type="submit" disabled={saveChapterOverride.isPending || removeChapterOverride.isPending}>{saveChapterOverride.isPending ? 'Saving…' : 'Save chapter'}<ArrowRight size={15}/></button>
+         </div>
+       </form>}
+     </Dialog>
   </div>;
 }
 

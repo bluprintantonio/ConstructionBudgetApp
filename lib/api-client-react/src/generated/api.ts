@@ -40,8 +40,11 @@ import type {
   BudgetQuoteUpdate,
   BudgetSource,
   BudgetSourceCheck,
+  CapChapter,
   HealthStatus,
   HouseType,
+  LineChapterOverride,
+  LineChapterOverrideInput,
   LineMarker,
   LineMarkerUpdate,
   PlannerInputs,
@@ -1122,6 +1125,371 @@ export const useCreateBudgetLine = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateBudgetLineMutationOptions(options), queryClient);
+    }
+
+export const getGetCapChaptersUrl = () => {
+
+
+
+
+  return `/api/budget/cap-chapters`
+}
+
+/**
+ * @summary List effective CAP chapter definitions
+ */
+export const getCapChapters = async ( options?: Parameters<typeof customFetch>[1]): Promise<CapChapter[]> => {
+
+  return customFetch<CapChapter[]>(getGetCapChaptersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCapChaptersQueryKey = () => {
+    return [
+    `/api/budget/cap-chapters`
+    ] as const;
+    }
+
+
+export const getGetCapChaptersQueryOptions = <TData = Awaited<ReturnType<typeof getCapChapters>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCapChaptersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCapChapters>>> = ({ signal }) => getCapChapters({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCapChaptersQueryResult = NonNullable<Awaited<ReturnType<typeof getCapChapters>>>
+export type GetCapChaptersQueryError = ErrorType<unknown>
+
+
+export function useGetCapChapters<TData = Awaited<ReturnType<typeof getCapChapters>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCapChapters>>,
+          TError,
+          Awaited<ReturnType<typeof getCapChapters>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCapChapters<TData = Awaited<ReturnType<typeof getCapChapters>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCapChapters>>,
+          TError,
+          Awaited<ReturnType<typeof getCapChapters>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCapChapters<TData = Awaited<ReturnType<typeof getCapChapters>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List effective CAP chapter definitions
+ */
+
+export function useGetCapChapters<TData = Awaited<ReturnType<typeof getCapChapters>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCapChapters>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCapChaptersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLineChapterOverridesUrl = () => {
+
+
+
+
+  return `/api/budget/line-chapter-overrides`
+}
+
+/**
+ * @summary List budget line chapter overrides
+ */
+export const getLineChapterOverrides = async ( options?: Parameters<typeof customFetch>[1]): Promise<LineChapterOverride[]> => {
+
+  return customFetch<LineChapterOverride[]>(getGetLineChapterOverridesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLineChapterOverridesQueryKey = () => {
+    return [
+    `/api/budget/line-chapter-overrides`
+    ] as const;
+    }
+
+
+export const getGetLineChapterOverridesQueryOptions = <TData = Awaited<ReturnType<typeof getLineChapterOverrides>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLineChapterOverridesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLineChapterOverrides>>> = ({ signal }) => getLineChapterOverrides({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLineChapterOverridesQueryResult = NonNullable<Awaited<ReturnType<typeof getLineChapterOverrides>>>
+export type GetLineChapterOverridesQueryError = ErrorType<unknown>
+
+
+export function useGetLineChapterOverrides<TData = Awaited<ReturnType<typeof getLineChapterOverrides>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLineChapterOverrides>>,
+          TError,
+          Awaited<ReturnType<typeof getLineChapterOverrides>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLineChapterOverrides<TData = Awaited<ReturnType<typeof getLineChapterOverrides>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLineChapterOverrides>>,
+          TError,
+          Awaited<ReturnType<typeof getLineChapterOverrides>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLineChapterOverrides<TData = Awaited<ReturnType<typeof getLineChapterOverrides>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List budget line chapter overrides
+ */
+
+export function useGetLineChapterOverrides<TData = Awaited<ReturnType<typeof getLineChapterOverrides>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLineChapterOverrides>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLineChapterOverridesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpsertLineChapterOverrideUrl = (budgetLineCode: string,) => {
+
+
+
+
+  return `/api/budget/line-chapter-overrides/${budgetLineCode}`
+}
+
+/**
+ * @summary Add or change a budget line chapter override
+ */
+export const upsertLineChapterOverride = async (budgetLineCode: string,
+    lineChapterOverrideInput: LineChapterOverrideInput, options?: Parameters<typeof customFetch>[1]): Promise<LineChapterOverride> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<LineChapterOverride>(getUpsertLineChapterOverrideUrl(budgetLineCode),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(lineChapterOverrideInput)
+  }
+);}
+
+
+
+
+
+export const getUpsertLineChapterOverrideMutationKey = () => ['upsertLineChapterOverride'] as const;
+
+export const getUpsertLineChapterOverrideMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertLineChapterOverride>>, TError,UpsertLineChapterOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertLineChapterOverride>>, TError,UpsertLineChapterOverrideMutationVariables, TContext> => {
+
+const mutationKey = getUpsertLineChapterOverrideMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertLineChapterOverride>>, UpsertLineChapterOverrideMutationVariables> = (props) => {
+          const {budgetLineCode,data} = props ?? {};
+
+          return  upsertLineChapterOverride(budgetLineCode,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertLineChapterOverrideMutationResult = NonNullable<Awaited<ReturnType<typeof upsertLineChapterOverride>>>
+    export type UpsertLineChapterOverrideMutationBody = BodyType<LineChapterOverrideInput>
+    export type UpsertLineChapterOverrideMutationError = ErrorType<void>
+    export type UpsertLineChapterOverrideMutationVariables = {budgetLineCode: string;data: BodyType<LineChapterOverrideInput>}
+
+    /**
+ * @summary Add or change a budget line chapter override
+ */
+export const useUpsertLineChapterOverride = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertLineChapterOverride>>, TError,UpsertLineChapterOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof upsertLineChapterOverride>>,
+        TError,
+        UpsertLineChapterOverrideMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpsertLineChapterOverrideMutationOptions(options), queryClient);
+    }
+
+export const getDeleteLineChapterOverrideUrl = (budgetLineCode: string,) => {
+
+
+
+
+  return `/api/budget/line-chapter-overrides/${budgetLineCode}`
+}
+
+/**
+ * @summary Remove a chapter override and restore the source chapter
+ */
+export const deleteLineChapterOverride = async (budgetLineCode: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteLineChapterOverrideUrl(budgetLineCode),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteLineChapterOverrideMutationKey = () => ['deleteLineChapterOverride'] as const;
+
+export const getDeleteLineChapterOverrideMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLineChapterOverride>>, TError,DeleteLineChapterOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLineChapterOverride>>, TError,DeleteLineChapterOverrideMutationVariables, TContext> => {
+
+const mutationKey = getDeleteLineChapterOverrideMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLineChapterOverride>>, DeleteLineChapterOverrideMutationVariables> = (props) => {
+          const {budgetLineCode} = props ?? {};
+
+          return  deleteLineChapterOverride(budgetLineCode,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteLineChapterOverrideMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLineChapterOverride>>>
+
+    export type DeleteLineChapterOverrideMutationError = ErrorType<unknown>
+    export type DeleteLineChapterOverrideMutationVariables = {budgetLineCode: string}
+
+    /**
+ * @summary Remove a chapter override and restore the source chapter
+ */
+export const useDeleteLineChapterOverride = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLineChapterOverride>>, TError,DeleteLineChapterOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteLineChapterOverride>>,
+        TError,
+        DeleteLineChapterOverrideMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteLineChapterOverrideMutationOptions(options), queryClient);
     }
 
 export const getUpdateBudgetLineMarkerUrl = (budgetLineCode: string,) => {

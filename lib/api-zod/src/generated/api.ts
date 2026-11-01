@@ -303,6 +303,65 @@ export const CreateBudgetLineResponse = zod.object({
 
 
 /**
+ * @summary List effective CAP chapter definitions
+ */
+export const GetCapChaptersResponseItem = zod.object({
+  "code": zod.string(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "kind": zod.enum(['original', 'added']),
+  "specReference": zod.string().nullable()
+})
+export const GetCapChaptersResponse = zod.array(GetCapChaptersResponseItem)
+
+
+/**
+ * @summary List budget line chapter overrides
+ */
+export const GetLineChapterOverridesResponseItem = zod.object({
+  "budgetLineCode": zod.string(),
+  "chapterCode": zod.string(),
+  "reason": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const GetLineChapterOverridesResponse = zod.array(GetLineChapterOverridesResponseItem)
+
+
+/**
+ * @summary Add or change a budget line chapter override
+ */
+export const UpsertLineChapterOverrideParams = zod.object({
+  "budgetLineCode": zod.coerce.string()
+})
+
+
+
+
+
+export const UpsertLineChapterOverrideBody = zod.object({
+  "chapterCode": zod.string().min(1),
+  "reason": zod.string().min(1)
+})
+
+export const UpsertLineChapterOverrideResponse = zod.object({
+  "budgetLineCode": zod.string(),
+  "chapterCode": zod.string(),
+  "reason": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Remove a chapter override and restore the source chapter
+ */
+export const DeleteLineChapterOverrideParams = zod.object({
+  "budgetLineCode": zod.coerce.string()
+})
+
+export const DeleteLineChapterOverrideResponse = zod.void()
+
+
+/**
  * @summary Update a budget line marker
  */
 export const UpdateBudgetLineMarkerParams = zod.object({

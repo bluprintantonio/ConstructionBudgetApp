@@ -193,6 +193,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BudgetLine"
+  /budget/cap-chapters:
+    get:
+      operationId: getCapChapters
+      tags: [budget]
+      summary: List effective CAP chapter definitions
+      responses:
+        "200":
+          description: CAP chapters in display order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CapChapter"
+  /budget/line-chapter-overrides:
+    get:
+      operationId: getLineChapterOverrides
+      tags: [budget]
+      summary: List budget line chapter overrides
+      responses:
+        "200":
+          description: Chapter overrides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LineChapterOverride"
+  /budget/line-chapter-overrides/{budgetLineCode}:
+    parameters:
+      - name: budgetLineCode
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: upsertLineChapterOverride
+      tags: [budget]
+      summary: Add or change a budget line chapter override
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineChapterOverrideInput"
+      responses:
+        "200":
+          description: Saved chapter override
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineChapterOverride"
+        "400":
+          description: Invalid override
+        "404":
+          description: Budget line or chapter not found
+    delete:
+      operationId: deleteLineChapterOverride
+      tags: [budget]
+      summary: Remove a chapter override and restore the source chapter
+      responses:
+        "204":
+          description: Chapter override removed
   /budget/line-markers/{budgetLineCode}:
     patch:
       operationId: updateBudgetLineMarker
@@ -574,6 +637,29 @@ components:
         sortOrder: { type: integer }
         costBasis: { type: string }
       required: [id, name, sortOrder, costBasis]
+    CapChapter:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        sortOrder: { type: integer }
+        kind: { type: string, enum: [original, added] }
+        specReference: { type: ["string", "null"] }
+      required: [code, name, sortOrder, kind, specReference]
+    LineChapterOverride:
+      type: object
+      properties:
+        budgetLineCode: { type: string }
+        chapterCode: { type: string }
+        reason: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [budgetLineCode, chapterCode, reason, createdAt]
+    LineChapterOverrideInput:
+      type: object
+      properties:
+        chapterCode: { type: string, minLength: 1 }
+        reason: { type: string, minLength: 1 }
+      required: [chapterCode, reason]
     BudgetLine:
       type: object
       properties:
