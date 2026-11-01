@@ -49,6 +49,7 @@ export * from './budgetSourceChild';
 export * from './budgetSourceSourceType';
 export * from './capChapter';
 export * from './capChapterKind';
+export * from './chapterSeedStatus';
 export * from './healthStatus';
 export * from './houseType';
 export * from './lineChapterOverride';

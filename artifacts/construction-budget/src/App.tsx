@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 import {
   BudgetExtra, BudgetExtraUpdate, BudgetLine, BudgetQuote, BudgetQuoteLink, BudgetLineInput, BudgetQuoteInput,
-  BudgetQuoteStatus, BudgetQuoteDocumentType,
+  BudgetQuoteStatus, BudgetQuoteDocumentType, CapChapter, LineChapterOverride,
   useHealthCheck, useGetBudgetDashboard, useGetBudgetProjects, useGetBudgetSources,
-  useCheckBudgetSourceConnection,
+  useCheckBudgetSourceConnection, useGetChapterSeedStatus,
   useGetBudgetExtras, useUpdateBudgetExtra,
   useGetBudgetLines, useGetBudgetQuotes, useGetBudgetQuoteLinks, useUpdateBudgetQuoteLinks,
   useGetCapChapters, useGetLineChapterOverrides, useUpsertLineChapterOverride, useDeleteLineChapterOverride,
@@ -387,11 +387,22 @@ function extraDraftFrom(extra: BudgetExtra): ExtraDraft {
 }
 
 function BudgetPage() {
+  const chapters = useGetCapChapters();
+  const overrides = useGetLineChapterOverrides();
+  const reloadChapters = () => { void chapters.refetch(); void overrides.refetch(); };
+  if (chapters.isError || overrides.isError) return <ErrorBlock onRetry={reloadChapters}/>;
+  if (!chapters.isSuccess || !overrides.isSuccess) return <LoadingBlock/>;
+  return <BudgetPageContent chapterRows={chapters.data} chapterOverrides={overrides.data} reloadChapters={reloadChapters}/>;
+}
+
+function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
+  chapterRows: CapChapter[];
+  chapterOverrides: LineChapterOverride[];
+  reloadChapters: () => void;
+}) {
   const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
   const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
   const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
-  const capChaptersQuery = useGetCapChapters();
-  const chapterOverridesQuery = useGetLineChapterOverrides();
   const saveChapterOverride = useUpsertLineChapterOverride();
   const removeChapterOverride = useDeleteLineChapterOverride();
   const { currencyCode } = useCurrency();
@@ -427,10 +438,9 @@ function BudgetPage() {
   ), [quotesQuery.data, quoteLinksQuery.data, lines]);
   const quotesById = new Map((quotesQuery.data || []).map(quote => [quote.id, quote]));
   const chapters = useMemo(
-    () => [...(capChaptersQuery.data || [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [capChaptersQuery.data],
+    () => [...chapterRows].sort((a, b) => a.sortOrder - b.sortOrder),
+    [chapterRows],
   );
-  const chapterOverrides = chapterOverridesQuery.data || [];
   const chapterOverridesByCode = useMemo(
     () => new Map(chapterOverrides.map(override => [override.budgetLineCode, override])),
     [chapterOverrides],
@@ -439,6 +449,7 @@ function BudgetPage() {
     () => new Map(lines.map(line => [line.id, getEffectiveChapter(line, chapters, chapterOverrides)])),
     [lines, chapters, chapterOverrides],
   );
+  const chapterWarnings = [...effectiveChapterByLineId.values()].flatMap(chapter => chapter.warning ? [chapter.warning] : []);
   const filtered = useMemo(() => lines.filter(line => {
     const effective = effectiveChapterByLineId.get(line.id);
     const matchesChapter = chapterFilter === 'all' || effective?.code === chapterFilter;
@@ -455,7 +466,7 @@ function BudgetPage() {
       chapters,
       chapterOverrides,
       !search.trim(),
-    ).filter(group => chapterFilter === 'all' || group.code === chapterFilter),
+    ).groups.filter(group => chapterFilter === 'all' || group.code === chapterFilter),
     [filtered, chapters, chapterOverrides, search, chapterFilter],
   );
   const premiumReconciliation = useMemo(
@@ -481,7 +492,7 @@ function BudgetPage() {
    const pendingExtrasCount = extras.filter(extra => extra.unitPrice == null).length;
    const selectedPackExtrasTotal = packTotals?.[selectedPack]?.fromExtras ?? null;
    const houseItemCount = dashboard.data?.lineCount ?? lines.length;
-  const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); void capChaptersQuery.refetch(); void chapterOverridesQuery.refetch(); };
+  const reload = () => { void query.refetch(); void dashboard.refetch(); void quotesQuery.refetch(); void quoteLinksQuery.refetch(); reloadChapters(); };
   const draftForExtra = (extra: BudgetExtra) => extraDrafts[extra.id] ?? extraDraftFrom(extra);
   const changeExtraDraft = (extra: BudgetExtra, patch: Partial<ExtraDraft>) => setExtraDrafts(current => ({
     ...current,
@@ -636,7 +647,8 @@ function BudgetPage() {
       <td className="marker-cell"><span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label></td>
       <td className="material-chapter">
         <span>{effectiveChapter ? `${effectiveChapter.code} ${effectiveChapter.name}` : line.category}</span>
-        {chapterOverride && <small className="chapter-override-tag" title={chapterOverride.reason}>moved from {effectiveChapter?.sourceChapterCode || 'source chapter'} · {chapterOverride.reason}</small>}
+        {effectiveChapter?.isOverridden && chapterOverride && <small className="chapter-override-tag" title={chapterOverride.reason}>moved from {effectiveChapter.sourceChapterCode || 'source chapter'} · {chapterOverride.reason}</small>}
+        {effectiveChapter?.warning && <small className="pill attention" title={effectiveChapter.warning.message} data-testid={`warning-chapter-line-${line.code}`}>Override warning · CSV chapter used</small>}
         <button className="chapter-override-button" type="button" disabled={!line.code} onClick={() => openChapterEditor(line)}>{chapterOverride ? 'Change' : 'Move'}</button>
       </td>
       <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
@@ -659,13 +671,14 @@ function BudgetPage() {
       <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
     </tr>;
   };
-  if (query.isLoading || capChaptersQuery.isLoading || chapterOverridesQuery.isLoading) return <LoadingBlock/>;
-  if (query.isError || capChaptersQuery.isError || chapterOverridesQuery.isError) return <ErrorBlock onRetry={reload}/>;
+  if (query.isLoading) return <LoadingBlock/>;
+  if (query.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
       <section className="materials-hero">
         <div className="materials-hero-copy"><div className="eyebrow">WORKSPACE / MASTER MAP</div><h1>Materials &amp; quantities</h1><p>Source quantities and pack pricing, organized by chapter.</p></div>
         <div className="materials-hero-actions"><div className="materials-toggle-slot" aria-hidden="true"/><div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines, extrasQuery.data || [])} disabled={!lines.length || extrasQuery.isLoading || extrasQuery.isError}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div></div>
       </section>
+      {chapterWarnings.length > 0 && <div className="inline-message" role="alert" data-testid="warning-chapter-overrides"><AlertCircle size={16}/><div>{chapterWarnings.map(warning => <div key={`${warning.budgetLineCode}-${warning.chapterCode}`}>{warning.message}</div>)}<small>These overrides are ignored; the CSV chapters and totals are retained.</small></div></div>}
       <section className="materials-pack-section" aria-labelledby="materials-pack-heading">
         <div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2 id="materials-pack-heading">Pack totals</h2></div></div>
         {packTotals ? <div className="materials-pack-grid" role="group" aria-label="Select a pack">
@@ -1066,6 +1079,7 @@ function QuotesPage() {
 
 function SourcesPage() {
   const sources = useGetBudgetSources(); const projects = useGetBudgetProjects(); const health = useHealthCheck();
+  const chapterSeedStatus = useGetChapterSeedStatus();
   const checkConnection = useCheckBudgetSourceConnection();
   const [query, setQuery] = useState('');
   const [checkingSourceId, setCheckingSourceId] = useState<string | null>(null);
@@ -1092,6 +1106,8 @@ function SourcesPage() {
   };
   return <div>
     <PageHeader eyebrow="WORKSPACE / TRACEABILITY" title="Sources & references" description="The master quantity map, supplier files from boxes, and separate architecture references." action={<span className="connected-label"><span className={`health-dot ${health.data?.status === 'ok' ? 'is-up' : ''}`}/> {health.data?.status === 'ok' ? 'App online' : 'App status'}</span>}/>
+    {chapterSeedStatus.data?.seeded === false && <div className="inline-message" role="status" data-testid="status-chapter-data-not-seeded"><AlertCircle size={15}/>chapter data not seeded</div>}
+    {chapterSeedStatus.isError && <div className="inline-message" role="status">Could not check chapter seed status.</div>}
     <section className="source-hero"><div className="source-hero-copy"><div className="eyebrow">LINKED MATERIAL</div><h2>Good decisions<br/>start with <em>good sources.</em></h2><p>Open the original working documents whenever a number or assumption needs context.</p></div><div className="source-hero-graphic"><div className="folder-illustration"><div className="folder-tab"/><div className="folder-sheet sheet-one"/><div className="folder-sheet sheet-two"><span/><span/><span/></div><div className="folder-front"><div className="folder-emblem"><Link2 size={22}/></div></div></div><div className="source-orbit orbit-a"/><div className="source-orbit orbit-b"/><span className="orbit-node node-a"><FileSpreadsheet size={14}/></span><span className="orbit-node node-b"><FileText size={14}/></span></div></section>
     <div className="source-section-head"><div><div className="eyebrow">DRIVE LIBRARY</div><h2>Linked files & folders <span>{files.length.toString().padStart(2,'0')}</span></h2></div><div className="source-search"><Search size={15}/><input placeholder="Find a source…" aria-label="Search sources" value={query} onChange={e => setQuery(e.target.value)}/></div></div>
     <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div><div className="source-card-foot"><span>Last checked: {formatDate(source.lastCheckedAt)}</span><span>Status: {source.status ? titleCase(source.status) : 'Not checked'}</span></div><button className="button button-secondary button-small" type="button" disabled={checkingSourceId !== null} onClick={() => { void checkSource(source.id); }}>{checkingSourceId === source.id ? 'Checking…' : 'Check connection'}</button>{(checkErrors[source.id] || source.status === 'error') && <p role="alert">{checkErrors[source.id] || 'Drive access failed on the last check.'}</p>}{source.sourceType === 'folder' && source.itemCount !== null && <details open><summary className="source-card-foot">{source.itemCount} direct children</summary><div className="building-list">{source.children.map((child, childIndex) => <div className="building-row" key={`${child.name}-${childIndex}`}><span className="building-index">{String(childIndex + 1).padStart(2, '0')}</span><div className="building-name"><strong>{child.name}</strong><span>{child.type} · {formatDate(child.modifiedTime)}</span></div></div>)}</div></details>}</article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>

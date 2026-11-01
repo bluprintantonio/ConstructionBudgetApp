@@ -26,6 +26,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /budget/chapter-seed-status:
+    get:
+      operationId: getChapterSeedStatus
+      tags: [budget]
+      summary: Get chapter startup seed status
+      responses:
+        "200":
+          description: Whether the chapter startup seed completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterSeedStatus"
   /budget/dashboard:
     get:
       operationId: getBudgetDashboard
@@ -501,6 +513,11 @@ paths:
           description: Quote not found
 components:
   schemas:
+    ChapterSeedStatus:
+      type: object
+      required: [seeded]
+      properties:
+        seeded: { type: boolean }
     HealthStatus:
       type: object
       properties:

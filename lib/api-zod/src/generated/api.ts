@@ -18,6 +18,14 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get chapter startup seed status
+ */
+export const GetChapterSeedStatusResponse = zod.object({
+  "seeded": zod.boolean()
+})
+
+
+/**
  * @summary Get budget dashboard summary
  */
 export const GetBudgetDashboardResponse = zod.object({

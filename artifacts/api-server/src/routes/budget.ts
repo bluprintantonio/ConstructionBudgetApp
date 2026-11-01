@@ -33,6 +33,7 @@ import {
   GetBudgetQuotesResponse,
   GetBudgetSourcesResponse,
   GetCapChaptersResponse,
+  GetChapterSeedStatusResponse,
   GetLineChapterOverridesResponse,
   GetPlannerHouseTypesResponse,
   GetPlannerInputsResponse,
@@ -74,6 +75,7 @@ import {
   initialLineMarkerAssignments,
   toQuoteRow,
 } from "../lib/budget-seed";
+import { getChapterSeedStatus } from "../lib/chapter-seed";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
@@ -755,6 +757,10 @@ router.post(
     }
   },
 );
+
+router.get("/budget/chapter-seed-status", (_req, res): void => {
+  res.json(GetChapterSeedStatusResponse.parse(getChapterSeedStatus()));
+});
 
 router.get("/budget/cap-chapters", async (_req, res): Promise<void> => {
   const chapters = await db

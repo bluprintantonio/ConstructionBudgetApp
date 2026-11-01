@@ -27,6 +27,19 @@ export type EffectiveChapter = ChapterRecord & {
   sourceChapterCode: string | null;
   isOverridden: boolean;
   overrideReason: string | null;
+  warning: ChapterOverrideWarning | null;
+};
+
+export type ChapterOverrideWarning = {
+  budgetLineCode: string;
+  chapterCode: string;
+  message: string;
+};
+
+export type ChapterGroupsResult = {
+  ready: boolean;
+  groups: ChapterGroup[];
+  warnings: ChapterOverrideWarning[];
 };
 
 export type ChapterGroup = {
@@ -56,12 +69,19 @@ export function getEffectiveChapter(
   const override = line.code
     ? overrides.find((row) => row.budgetLineCode === line.code)
     : undefined;
-  const code = override?.chapterCode ?? sourceCode ?? line.category;
+  const overrideChapter = override
+    ? chapters.find((row) => row.code === override.chapterCode)
+    : undefined;
+  const warning = override && !overrideChapter
+    ? {
+        budgetLineCode: override.budgetLineCode,
+        chapterCode: override.chapterCode,
+        message: `override for line ${override.budgetLineCode} points to unknown chapter ${override.chapterCode}`,
+      }
+    : null;
+  const appliedOverride = overrideChapter ? override : undefined;
+  const code = appliedOverride?.chapterCode ?? sourceCode ?? line.category;
   const chapter = chapters.find((row) => row.code === code);
-
-  if (override && !chapter) {
-    throw new Error(`Chapter override points to unknown chapter "${code}".`);
-  }
 
   const sourceName = sourceCode
     ? line.category.replace(/^CAP\.\s*\d+\s*/i, "").trim()
@@ -74,22 +94,28 @@ export function getEffectiveChapter(
     kind: chapter?.kind ?? "original",
     specReference: chapter?.specReference ?? null,
     sourceChapterCode: sourceCode,
-    isOverridden: Boolean(override),
-    overrideReason: override?.reason ?? null,
+    isOverridden: Boolean(appliedOverride),
+    overrideReason: appliedOverride?.reason ?? null,
+    warning,
   };
 }
 
 export function calculateChapterGroups(
   lines: readonly ChapterBudgetLine[],
-  chapters: readonly ChapterRecord[],
-  overrides: readonly ChapterOverrideRecord[],
+  chapters: readonly ChapterRecord[] | undefined,
+  overrides: readonly ChapterOverrideRecord[] | undefined,
   includeEmptyAdded = true,
-): ChapterGroup[] {
+): ChapterGroupsResult {
+  if (!chapters || !overrides) {
+    return { ready: false, groups: [], warnings: [] };
+  }
   const grouped = new Map<string, ChapterBudgetLine[]>();
   const effectiveByCode = new Map<string, EffectiveChapter>();
+  const warnings: ChapterOverrideWarning[] = [];
 
   for (const line of lines) {
     const effective = getEffectiveChapter(line, chapters, overrides);
+    if (effective.warning) warnings.push(effective.warning);
     effectiveByCode.set(effective.code, effective);
     grouped.set(effective.code, [...(grouped.get(effective.code) ?? []), line]);
   }
@@ -113,7 +139,7 @@ export function calculateChapterGroups(
     );
   });
 
-  return codes.map((code) => {
+  const groups = codes.map((code) => {
     const chapter = chapterByCode.get(code) ?? effectiveByCode.get(code);
     if (!chapter) {
       throw new Error(`Could not resolve effective chapter "${code}".`);
@@ -133,4 +159,5 @@ export function calculateChapterGroups(
       },
     };
   });
+  return { ready: true, groups, warnings };
 }

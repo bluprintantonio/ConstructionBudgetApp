@@ -2,6 +2,36 @@ import type {
   CapChapter,
   LineChapterOverrideInsert,
 } from "@workspace/db";
+import { budgetMetaTable, capChaptersTable, db, lineChapterOverridesTable } from "@workspace/db";
+import { logger } from "./logger";
+
+let chapterDataSeeded = false;
+
+export function getChapterSeedStatus() {
+  return { seeded: chapterDataSeeded };
+}
+
+export async function seedChapterData(database: Pick<typeof db, "transaction"> = db): Promise<boolean> {
+  try {
+    await database.transaction(async (tx) => {
+      const [newSeedMarker] = await tx
+        .insert(budgetMetaTable)
+        .values({ id: "cap-chapters-v1" })
+        .onConflictDoNothing()
+        .returning({ id: budgetMetaTable.id });
+      if (newSeedMarker) {
+        await tx.insert(capChaptersTable).values(capChapterSeedRows).onConflictDoNothing();
+        await tx.insert(lineChapterOverridesTable).values(lineChapterOverrideSeedRows).onConflictDoNothing();
+      }
+    });
+    chapterDataSeeded = true;
+    return true;
+  } catch (err) {
+    chapterDataSeeded = false;
+    logger.error({ err }, "Chapter data not seeded; API will continue and retry on next start");
+    return false;
+  }
+}
 
 export const capChapterSeedRows = [
   { code: "CAP. 0", name: "Estaleiro", sortOrder: 0, kind: "original", specReference: "CAP_00" },

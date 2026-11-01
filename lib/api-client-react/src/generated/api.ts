@@ -41,6 +41,7 @@ import type {
   BudgetSource,
   BudgetSourceCheck,
   CapChapter,
+  ChapterSeedStatus,
   HealthStatus,
   HouseType,
   LineChapterOverride,
@@ -170,6 +171,107 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetChapterSeedStatusUrl = () => {
+
+
+
+
+  return `/api/budget/chapter-seed-status`
+}
+
+/**
+ * @summary Get chapter startup seed status
+ */
+export const getChapterSeedStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<ChapterSeedStatus> => {
+
+  return customFetch<ChapterSeedStatus>(getGetChapterSeedStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChapterSeedStatusQueryKey = () => {
+    return [
+    `/api/budget/chapter-seed-status`
+    ] as const;
+    }
+
+
+export const getGetChapterSeedStatusQueryOptions = <TData = Awaited<ReturnType<typeof getChapterSeedStatus>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChapterSeedStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChapterSeedStatus>>> = ({ signal }) => getChapterSeedStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetChapterSeedStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getChapterSeedStatus>>>
+export type GetChapterSeedStatusQueryError = ErrorType<unknown>
+
+
+export function useGetChapterSeedStatus<TData = Awaited<ReturnType<typeof getChapterSeedStatus>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChapterSeedStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getChapterSeedStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetChapterSeedStatus<TData = Awaited<ReturnType<typeof getChapterSeedStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChapterSeedStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getChapterSeedStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetChapterSeedStatus<TData = Awaited<ReturnType<typeof getChapterSeedStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get chapter startup seed status
+ */
+
+export function useGetChapterSeedStatus<TData = Awaited<ReturnType<typeof getChapterSeedStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChapterSeedStatus>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetChapterSeedStatusQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
