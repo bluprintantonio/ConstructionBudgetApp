@@ -15,7 +15,7 @@ export interface CapChapter {
   /** @nullable */
   specReference: string | null;
   /** @nullable */
-  decidedOn: Date | null;
+  decidedOn: string | null;
   /** @nullable */
   decisionReason: string | null;
 }

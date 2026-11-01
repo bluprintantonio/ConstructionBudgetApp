@@ -11,5 +11,6 @@ export interface LineChapterOverrideInput {
   chapterCode: string;
   /** @minLength 1 */
   reason: string;
-  decidedOn: Date;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  decidedOn: string;
 }

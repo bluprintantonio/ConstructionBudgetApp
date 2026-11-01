@@ -25,5 +25,5 @@ export interface BudgetExtra {
   /** @nullable */
   decisionReason: string | null;
   /** @nullable */
-  decidedOn: Date | null;
+  decidedOn: string | null;
 }

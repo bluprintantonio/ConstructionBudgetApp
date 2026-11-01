@@ -1,5 +1,5 @@
 import type {
-  CapChapter,
+  CapChapterInsert,
   LineChapterOverrideInsert,
 } from "@workspace/db";
 import { budgetMetaTable, capChaptersTable, db, lineChapterOverridesTable } from "@workspace/db";
@@ -54,7 +54,7 @@ export const capChapterSeedRows = [
   { code: "CAP. 17", name: "Impermeabilizações", sortOrder: 17, kind: "added", specReference: "CAP_13", decidedOn: "2026-11-01", decisionReason: "Added at the user's request." },
   { code: "CAP. 18", name: "Isolamentos Térmicos", sortOrder: 18, kind: "added", specReference: null, decidedOn: "2026-11-01", decisionReason: "Added at the user's request." },
   { code: "CAP. 19", name: "AVAC", sortOrder: 19, kind: "added", specReference: "CAP_14", decidedOn: "2026-11-01", decisionReason: "Added at the user's request." },
-] satisfies CapChapter[];
+] satisfies CapChapterInsert[];
 
 export const lineChapterOverrideSeedRows = [
   {

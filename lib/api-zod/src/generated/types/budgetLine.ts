@@ -61,7 +61,7 @@ export interface BudgetLine {
   /** @nullable */
   markerDecisionReason: string | null;
   /** @nullable */
-  markerDecidedOn: Date | null;
+  markerDecidedOn: string | null;
   /** @nullable */
   sourceUrl: string | null;
   createdAt: string;

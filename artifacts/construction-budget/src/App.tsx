@@ -402,6 +402,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
 }) {
   const query = useGetBudgetLines(); const dashboard = useGetBudgetDashboard(); const client = useQueryClient();
   const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
+  const sourcesQuery = useGetBudgetSources();
   const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
   const saveChapterOverride = useUpsertLineChapterOverride();
   const removeChapterOverride = useDeleteLineChapterOverride();
@@ -437,6 +438,8 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
      return () => window.removeEventListener('popstate', syncBoardFromUrl);
    }, []);
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
+  const sourceById = new Map((sourcesQuery.data || []).map(source => [source.id, source]));
+  const masterSnapshotVerifiedOn = sourceById.get('materials-master')?.snapshotVerifiedOn;
   const quoteComparisons = useMemo(() => calculateQuoteComparisons(
     quotesQuery.data || [],
     quoteLinksQuery.data || [],
@@ -532,8 +535,8 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
     setMarkerDecisionDraft({
       line,
       marker,
-      decisionReason: '',
-      decidedOn: localDateString(),
+      decisionReason: marker === line.marker ? line.markerDecisionReason ?? '' : '',
+      decidedOn: marker === line.marker ? line.markerDecidedOn ?? localDateString() : localDateString(),
     });
   };
   const saveMarkerDecision = (event: FormEvent<HTMLFormElement>) => {
@@ -674,19 +677,21 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
     const marker = line.marker || 'common';
     const effectiveChapter = effectiveChapterByLineId.get(line.id);
     const chapterOverride = line.code ? chapterOverridesByCode.get(line.code) : undefined;
+    const snapshotVerifiedOn = line.sourceId ? sourceById.get(line.sourceId)?.snapshotVerifiedOn : null;
     return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
       <td>
         <span className="material-code">{line.code || '—'}</span>
         {line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}
         {line.origin === 'imported' && <span className="pill neutral">Imported snapshot</span>}
-        {line.origin === 'imported' && <small className="source-ref">Matches Drive CSV · verified 2026-10-31</small>}
+        {line.origin === 'imported' && snapshotVerifiedOn && <small className="source-ref provenance-detail">Matches Drive CSV · verified {snapshotVerifiedOn}</small>}
         {line.origin === 'manual' && <span className="pill neutral">Decision</span>}
         {line.origin === 'assumption' && <span className="pill attention">ASSUMPTION</span>}
       </td>
       <td className="marker-cell">
         <span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span>
-        {line.markerDecisionReason && <small className="source-ref" title={line.markerDecisionReason}>Decision · {line.markerDecidedOn || '—'} · {line.markerDecisionReason}</small>}
+        {line.markerDecisionReason && <small className="source-ref provenance-detail" title={line.markerDecisionReason}>Decision · {line.markerDecidedOn || '—'} · {line.markerDecisionReason}</small>}
         <label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label>
+        <button className="chapter-override-button" type="button" disabled={!line.code || updateMarker.isPending} onClick={() => saveMarker(line, marker)}>Edit decision</button>
       </td>
       <td className="material-chapter">
         <span>{effectiveChapter ? `${effectiveChapter.code} ${effectiveChapter.name}` : line.category}</span>
@@ -787,7 +792,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
               <tbody>{extras.map(extra => {
                 const draft = draftForExtra(extra);
                 return <tr key={extra.id} data-testid={`row-extra-${extra.id}`}>
-                  <td><strong data-testid={`text-extra-name-${extra.id}`}>{extra.name}</strong><small className="source-ref" title={extra.decisionReason || undefined}>Decision · {extra.decidedOn || '—'} · {extra.decisionReason || 'Reason not recorded'}</small></td>
+                  <td><strong data-testid={`text-extra-name-${extra.id}`}>{extra.name}</strong><small className="source-ref provenance-detail" title={extra.decisionReason || undefined}>Decision · {extra.decidedOn || '—'} · {extra.decisionReason || 'Reason not recorded'}</small></td>
                   <td><div className="row-actions">{extra.inEco && <span className="pill" data-testid={`flag-extra-eco-${extra.id}`}><i/>Eco</span>}{extra.inPremium && <span className="pill" data-testid={`flag-extra-premium-${extra.id}`}><i/>Premium</span>}</div></td>
                   <td><label className="form-field"><input aria-label={`${extra.name} quantity`} data-testid={`input-extra-quantity-${extra.id}`} type="number" min="0" step="1" value={draft.quantity} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { quantity: event.target.value })}/></label></td>
                   <td data-testid={`text-extra-unit-${extra.id}`}>{extra.unit}</td>
@@ -853,7 +858,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
           <div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter.code} key={chapter.code}>{chapter.code} {chapter.name}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div>
         </div>
         <div className="table-footer materials-count">
-       <span className="materials-count-primary">Showing {filtered.length} of {lines.length} materials<span className="materials-count-source"><span className="footer-dot"/>Matches Drive CSV · verified 2026-10-31</span></span>
+       <span className="materials-count-primary">Showing {filtered.length} of {lines.length} materials<span className="materials-count-source"><span className="footer-dot"/>{masterSnapshotVerifiedOn ? `Matches Drive CSV · verified ${masterSnapshotVerifiedOn}` : 'Imported snapshot'}</span></span>
           <span className="materials-count-secondary"><span className="materials-count-note">{houseItemCount} materials · {chapters.length} chapters · Zero values and all three source tiers are preserved exactly.</span><button className="materials-marker-tip" type="button" title="Changing a marker changes the Premium total. Lines without a saved marker count as Common." aria-label="Marker note: Changing a marker changes the Premium total. Lines without a saved marker count as Common."><CircleHelp size={13}/></button></span>
         </div>
        <div className="chapter-list">
@@ -864,16 +869,22 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
               {empty
                 ? <div className="chapter-card-header chapter-card-header-empty">
                     <span className="chapter-chevron"><ChevronRight size={17}/></span>
-                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span>{group.kind === 'original' && <small className="source-ref">Imported snapshot</small>}{group.kind === 'added' && <small className="chapter-override-tag" title={group.decisionReason || ''}>Decision · {group.decidedOn || '—'} · {group.decisionReason || 'Added at the user’s request.'}</small>}{group.specReference && <small className="source-ref">Suggested, unverified · ASSUMPTION · {group.specReference}</small>}</span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
                     <span className="chapter-empty-label">no lines yet</span>
                     <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
                   </div>
                 : <button className="chapter-card-header" type="button" aria-expanded={!collapsed} onClick={() => toggleChapter(group.code)}>
                     <span className={`chapter-chevron${collapsed ? '' : ' is-open'}`}><ChevronRight size={17}/></span>
-                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span>{group.kind === 'original' && <small className="source-ref">Imported snapshot</small>}{group.kind === 'added' && <small className="chapter-override-tag" title={group.decisionReason || ''}>Decision · {group.decidedOn || '—'} · {group.decisionReason || 'Added at the user’s request.'}</small>}{group.specReference && <small className="source-ref">Suggested, unverified · ASSUMPTION · {group.specReference}</small>}</span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
                     <span className="chapter-count">{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'}</span>
                     <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
                   </button>}
+              <div className="chapter-provenance">
+                {group.kind === 'original'
+                  ? <span className="pill neutral">Imported snapshot</span>
+                  : <span className="source-ref">Decision · {group.decidedOn || '—'} · {group.decisionReason || 'Reason not recorded'}</span>}
+                {group.specReference && <span className="source-ref">ASSUMPTION · {group.specReference} · suggested, unverified</span>}
+              </div>
               {!collapsed && <div className="table-scroll scrollbar-thin">
                <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div>
                <table className="data-table budget-table materials-table" data-selected-pack={selectedPack}>
@@ -886,7 +897,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
          {!chapterGroups.length && <EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/>}
        </div>
      </section>
-    <div className="data-footnote"><CircleHelp size={14}/> The CSV has no currency field; amounts are formatted in the selected display currency without conversion. A source value of 0 is preserved and is not interpreted as a free item.</div>
+    <div className="data-footnote"><CircleHelp size={14}/> The CSV has no currency field; amounts are formatted in the selected display currency without conversion. A source value of 0 is preserved and is not interpreted as a free item. Model rule: pack totals and Premium reconciliation use the shared pack engine.</div>
     <Dialog open={createOpen || !!editing} title={editing ? 'Edit material' : 'Add material'} subtitle="Keep the source code, quantities, and three scenarios together." onClose={() => { setCreateOpen(false); setEditing(null); }}>
       <form className="form-grid" onSubmit={e => save(e, editing || undefined)}>
         <Field label="Code"><input required name="code" readOnly={!!editing} defaultValue={editing?.code || ''} placeholder="e.g. 1.1"/></Field><Field label="Unit"><input required name="unit" defaultValue={editing?.unit || ''} placeholder="m2, ml, un…"/></Field>
@@ -1100,7 +1111,8 @@ function QuotesPage() {
           return <article key={quote.id} className={`quote-row fade-up ${quote.status === 'needs_review' ? 'quote-needs-review' : ''}`} style={{ animationDelay: `${index * 35}ms` }} data-testid={`card-quote-${quote.id}`}>
             <div className="file-icon"><FileText size={19}/><span>{quote.documentType === 'proposal' ? 'PDF' : quote.documentType.slice(0,3).toUpperCase()}</span></div>
             <div className="quote-details">
-              <div className="quote-title-line"><h3>{quote.fileName}</h3><StatusPill kind="quote" value={quote.status}/><span className="pill neutral">Imported snapshot</span></div>
+              <div className="quote-title-line"><h3>{quote.fileName}</h3><StatusPill kind="quote" value={quote.status}/></div>
+              <div className="quote-note"><span className="pill neutral">Imported snapshot (Drive listing)</span></div>
               <div className="quote-meta"><span>{quote.vendor || 'Vendor not identified'}</span><i/><span>{quote.category}</span>{quote.buildingType && <><i/><span>{quote.buildingType}</span></>}</div>
               <div className="quote-note">{quote.note || 'No review note added.'}</div>
               <div className="quote-note">{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
@@ -1116,7 +1128,7 @@ function QuotesPage() {
       </div>
       <div className="table-footer"><span>{filtered.length} documents</span><span>Linked source URLs open in a new tab</span></div>
     </section>
-    <div className="data-footnote"><ShieldCheck size={14}/> Proposal prices are entered by hand; PDF contents are not read by the app.</div>
+    <div className="data-footnote"><ShieldCheck size={14}/> Proposal prices are entered by hand; PDF contents are not read by the app. Model rule: differences and percentages use the shared quote comparison engine.</div>
     <Dialog open={dialog} title={editing ? 'Review document details' : 'Add a source document'} subtitle="Link the proposal to budget lines or extras and keep its review context in one place." onClose={closeDialog}>
       <form className="form-grid" onSubmit={save}>
         <Field label="File name"><input required name="fileName" defaultValue={editing?.fileName || ''} placeholder="Supplier proposal.pdf"/></Field><Field label="Category"><input required name="category" defaultValue={editing?.category || ''} placeholder="Work category"/></Field>

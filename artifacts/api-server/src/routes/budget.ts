@@ -229,7 +229,7 @@ function serializeSource(source: typeof sourcesTable.$inferSelect) {
     snapshotVerifiedOn: source.snapshotVerifiedOn,
     snapshotDriveModifiedTime:
       source.snapshotDriveModifiedTime?.toISOString() ?? null,
-    snapshotDriftStatus: source.snapshotVerifiedOn
+    snapshotDriftStatus: source.type === "csv"
       ? getSnapshotDriftStatus({
           snapshotDriveModifiedTime:
             source.snapshotDriveModifiedTime?.toISOString() ?? null,
@@ -763,8 +763,12 @@ router.patch(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.message });
+    if (!parsed.success || !parsed.data.decisionReason.trim()) {
+      res.status(400).json({
+        error: parsed.success
+          ? "A reason is required for a marker decision."
+          : parsed.error.message,
+      });
       return;
     }
     const [line] = await db

@@ -171,8 +171,8 @@ export const GetBudgetSourcesResponseItem = zod.object({
   "sourceType": zod.enum(['spreadsheet', 'folder', 'plan']),
   "url": zod.string(),
   "note": zod.string(),
-  "snapshotVerifiedOn": zod.coerce.date().nullable(),
-  "snapshotDriveModifiedTime": zod.coerce.date().nullable(),
+  "snapshotVerifiedOn": zod.string().nullable(),
+  "snapshotDriveModifiedTime": zod.string().nullable(),
   "snapshotDriftStatus": zod.union([zod.literal('never checked'),zod.literal('in sync'),zod.literal('changed in Drive'),zod.literal(null)]).nullable(),
   "driveModifiedTime": zod.string().nullable(),
   "lastCheckedAt": zod.string().nullable(),
@@ -241,7 +241,7 @@ export const GetBudgetLinesResponseItem = zod.object({
   "priceBasis": zod.string().nullable(),
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "markerDecisionReason": zod.string().nullable(),
-  "markerDecidedOn": zod.coerce.date().nullable(),
+  "markerDecidedOn": zod.string().nullable(),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -310,7 +310,7 @@ export const CreateBudgetLineResponse = zod.object({
   "priceBasis": zod.string().nullable(),
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "markerDecisionReason": zod.string().nullable(),
-  "markerDecidedOn": zod.coerce.date().nullable(),
+  "markerDecidedOn": zod.string().nullable(),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -326,7 +326,7 @@ export const GetCapChaptersResponseItem = zod.object({
   "sortOrder": zod.number().int(),
   "kind": zod.enum(['original', 'added']),
   "specReference": zod.string().nullable(),
-  "decidedOn": zod.coerce.date().nullable(),
+  "decidedOn": zod.string().nullable(),
   "decisionReason": zod.string().nullable()
 })
 export const GetCapChaptersResponse = zod.array(GetCapChaptersResponseItem)
@@ -339,7 +339,7 @@ export const GetLineChapterOverridesResponseItem = zod.object({
   "budgetLineCode": zod.string(),
   "chapterCode": zod.string(),
   "reason": zod.string(),
-  "decidedOn": zod.coerce.date().nullable(),
+  "decidedOn": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const GetLineChapterOverridesResponse = zod.array(GetLineChapterOverridesResponseItem)
@@ -354,19 +354,20 @@ export const UpsertLineChapterOverrideParams = zod.object({
 
 
 
+export const upsertLineChapterOverrideBodyDecidedOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const UpsertLineChapterOverrideBody = zod.object({
   "chapterCode": zod.string().min(1),
   "reason": zod.string().min(1),
-  "decidedOn": zod.coerce.date()
+  "decidedOn": zod.string().regex(upsertLineChapterOverrideBodyDecidedOnRegExp)
 })
 
 export const UpsertLineChapterOverrideResponse = zod.object({
   "budgetLineCode": zod.string(),
   "chapterCode": zod.string(),
   "reason": zod.string(),
-  "decidedOn": zod.coerce.date().nullable(),
+  "decidedOn": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 
@@ -389,19 +390,20 @@ export const UpdateBudgetLineMarkerParams = zod.object({
 })
 
 
+export const updateBudgetLineMarkerBodyDecidedOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const UpdateBudgetLineMarkerBody = zod.object({
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "decisionReason": zod.string().min(1),
-  "decidedOn": zod.coerce.date()
+  "decidedOn": zod.string().regex(updateBudgetLineMarkerBodyDecidedOnRegExp)
 })
 
 export const UpdateBudgetLineMarkerResponse = zod.object({
   "budgetLineCode": zod.string(),
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "decisionReason": zod.string().nullable(),
-  "decidedOn": zod.coerce.date().nullable()
+  "decidedOn": zod.string().nullable()
 })
 
 
@@ -467,7 +469,7 @@ export const ImportBudgetLinesResponseItem = zod.object({
   "priceBasis": zod.string().nullable(),
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "markerDecisionReason": zod.string().nullable(),
-  "markerDecidedOn": zod.coerce.date().nullable(),
+  "markerDecidedOn": zod.string().nullable(),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -540,7 +542,7 @@ export const UpdateBudgetLineResponse = zod.object({
   "priceBasis": zod.string().nullable(),
   "marker": zod.enum(['common', 'finishings', 'equipment', 'systems', 'not_applicable']),
   "markerDecisionReason": zod.string().nullable(),
-  "markerDecidedOn": zod.coerce.date().nullable(),
+  "markerDecidedOn": zod.string().nullable(),
   "sourceUrl": zod.string().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -573,7 +575,7 @@ export const GetBudgetExtrasResponseItem = zod.object({
   "quoteId": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "decisionReason": zod.string().nullable(),
-  "decidedOn": zod.coerce.date().nullable()
+  "decidedOn": zod.string().nullable()
 })
 export const GetBudgetExtrasResponse = zod.array(GetBudgetExtrasResponseItem)
 
@@ -612,7 +614,7 @@ export const UpdateBudgetExtraResponse = zod.object({
   "quoteId": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "decisionReason": zod.string().nullable(),
-  "decidedOn": zod.coerce.date().nullable()
+  "decidedOn": zod.string().nullable()
 })
 
 

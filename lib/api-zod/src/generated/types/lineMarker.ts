@@ -13,5 +13,5 @@ export interface LineMarker {
   /** @nullable */
   decisionReason: string | null;
   /** @nullable */
-  decidedOn: Date | null;
+  decidedOn: string | null;
 }

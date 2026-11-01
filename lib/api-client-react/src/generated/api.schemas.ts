@@ -226,6 +226,7 @@ export interface LineChapterOverrideInput {
   chapterCode: string;
   /** @minLength 1 */
   reason: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   decidedOn: string;
 }
 
@@ -491,6 +492,7 @@ export interface LineMarkerUpdate {
   marker: LineMarkerUpdateMarker;
   /** @minLength 1 */
   decisionReason: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   decidedOn: string;
 }
 

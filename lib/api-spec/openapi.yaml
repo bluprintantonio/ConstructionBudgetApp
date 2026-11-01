@@ -540,8 +540,8 @@ components:
         sourceType: { type: string, enum: [spreadsheet, folder, plan] }
         url: { type: string }
         note: { type: string }
-        snapshotVerifiedOn: { type: ["string", "null"], format: date }
-        snapshotDriveModifiedTime: { type: ["string", "null"], format: date-time }
+        snapshotVerifiedOn: { type: ["string", "null"] }
+        snapshotDriveModifiedTime: { type: ["string", "null"] }
         snapshotDriftStatus: { type: ["string", "null"], enum: [never checked, in sync, changed in Drive] }
         driveModifiedTime: { type: ["string", "null"] }
         lastCheckedAt: { type: ["string", "null"] }
@@ -665,7 +665,7 @@ components:
         sortOrder: { type: integer }
         kind: { type: string, enum: [original, added] }
         specReference: { type: ["string", "null"] }
-        decidedOn: { type: ["string", "null"], format: date }
+        decidedOn: { type: ["string", "null"] }
         decisionReason: { type: ["string", "null"] }
       required: [code, name, sortOrder, kind, specReference, decidedOn, decisionReason]
     LineChapterOverride:
@@ -674,7 +674,7 @@ components:
         budgetLineCode: { type: string }
         chapterCode: { type: string }
         reason: { type: string }
-        decidedOn: { type: ["string", "null"], format: date }
+        decidedOn: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
       required: [budgetLineCode, chapterCode, reason, decidedOn, createdAt]
     LineChapterOverrideInput:
@@ -682,7 +682,7 @@ components:
       properties:
         chapterCode: { type: string, minLength: 1 }
         reason: { type: string, minLength: 1 }
-        decidedOn: { type: string, format: date }
+        decidedOn: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
       required: [chapterCode, reason, decidedOn]
     BudgetLine:
       type: object
@@ -715,7 +715,7 @@ components:
         priceBasis: { type: ["string", "null"] }
         marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
         markerDecisionReason: { type: ["string", "null"] }
-        markerDecidedOn: { type: ["string", "null"], format: date }
+        markerDecidedOn: { type: ["string", "null"] }
         sourceUrl: { type: ["string", "null"] }
         createdAt: { type: string }
         updatedAt: { type: string }
@@ -781,14 +781,14 @@ components:
         budgetLineCode: { type: string }
         marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
         decisionReason: { type: ["string", "null"] }
-        decidedOn: { type: ["string", "null"], format: date }
+        decidedOn: { type: ["string", "null"] }
       required: [budgetLineCode, marker, decisionReason, decidedOn]
     LineMarkerUpdate:
       type: object
       properties:
         marker: { type: string, enum: [common, finishings, equipment, systems, not_applicable] }
         decisionReason: { type: string, minLength: 1 }
-        decidedOn: { type: string, format: date }
+        decidedOn: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
       required: [marker, decisionReason, decidedOn]
     BudgetExtra:
       type: object
@@ -805,7 +805,7 @@ components:
         quoteId: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
         decisionReason: { type: ["string", "null"] }
-        decidedOn: { type: ["string", "null"], format: date }
+        decidedOn: { type: ["string", "null"] }
       required: [id, name, inEco, inPremium, quantity, unit, priceScope, unitPrice, priceStatus, quoteId, notes, decisionReason, decidedOn]
     BudgetExtraUpdate:
       type: object

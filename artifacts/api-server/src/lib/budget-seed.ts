@@ -276,7 +276,7 @@ export const plannerHouseTypeSeedRows = [
 
 type BudgetLineSeed = Omit<
   BudgetLine,
-  "createdAt" | "updatedAt" | "sourceUrl" | "marker"
+  "createdAt" | "updatedAt" | "sourceUrl" | "marker" | "markerDecisionReason" | "markerDecidedOn"
 >;
 
 export const seedMaterials: BudgetLineSeed[] = materialMapRows.map(

@@ -11,6 +11,6 @@ export interface LineChapterOverride {
   chapterCode: string;
   reason: string;
   /** @nullable */
-  decidedOn: Date | null;
+  decidedOn: string | null;
   createdAt: Date;
 }

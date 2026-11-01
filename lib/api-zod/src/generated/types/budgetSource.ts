@@ -16,9 +16,9 @@ export interface BudgetSource {
   url: string;
   note: string;
   /** @nullable */
-  snapshotVerifiedOn: Date | null;
+  snapshotVerifiedOn: string | null;
   /** @nullable */
-  snapshotDriveModifiedTime: Date | null;
+  snapshotDriveModifiedTime: string | null;
   /** @nullable */
   snapshotDriftStatus: BudgetSourceSnapshotDriftStatus;
   /** @nullable */

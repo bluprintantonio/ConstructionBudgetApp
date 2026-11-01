@@ -86,6 +86,12 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
       WHERE budget_line_code = '0.2'
     `);
     await client.query(`
+      UPDATE pg_temp.line_markers
+      SET marker = 'common', decision_reason = 'Manual special-marker decision',
+          decided_on = '2026-10-30'
+      WHERE budget_line_code = '10.3'
+    `);
+    await client.query(`
       UPDATE pg_temp.extras
       SET unit_price = 123.45, price_status = 'estimate',
           decision_reason = 'Manual extra decision', decided_on = '2026-10-30'
@@ -99,7 +105,7 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
     await client.query(`
       UPDATE pg_temp.sources
       SET name = 'Manual source edit', drive_modified_time = '2026-11-02T10:00:00Z',
-          status = 'error', snapshot_verified_on = NULL,
+          status = 'error', snapshot_verified_on = '2026-10-30',
           snapshot_drive_modified_time = NULL
       WHERE id = 'materials-master'
     `);
@@ -159,8 +165,8 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
     });
 
     const markerRows = await client.query(`
-      SELECT marker, decision_reason, decided_on
-      FROM pg_temp.line_markers WHERE budget_line_code IN ('0.1', '0.2')
+      SELECT marker, decision_reason, decided_on::text AS decided_on
+      FROM pg_temp.line_markers WHERE budget_line_code IN ('0.1', '0.2', '10.3')
       ORDER BY budget_line_code
     `);
     assert.deepEqual(markerRows.rows, [
@@ -174,10 +180,16 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
         decision_reason: "Same in all packs: structure, earthworks, networks and common works",
         decided_on: "2026-11-01",
       },
+      {
+        marker: "common",
+        decision_reason: "Manual special-marker decision",
+        decided_on: "2026-10-30",
+      },
     ]);
 
     const extraRows = await client.query(`
-      SELECT unit_price, price_status, decision_reason, decided_on
+      SELECT unit_price::text AS unit_price, price_status, decision_reason,
+             decided_on::text AS decided_on
       FROM pg_temp.extras WHERE id IN ('solar-panels', 'heat-pump')
       ORDER BY id
     `);
@@ -197,7 +209,8 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
     ]);
 
     const source = await client.query(`
-      SELECT name, drive_modified_time, status, snapshot_verified_on,
+      SELECT name, drive_modified_time, status,
+             snapshot_verified_on::text AS snapshot_verified_on,
              snapshot_drive_modified_time
       FROM pg_temp.sources WHERE id = 'materials-master'
     `);
@@ -205,12 +218,12 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
       name: "Manual source edit",
       drive_modified_time: new Date("2026-11-02T10:00:00Z"),
       status: "error",
-      snapshot_verified_on: "2026-10-31",
+      snapshot_verified_on: "2026-10-30",
       snapshot_drive_modified_time: new Date("2026-10-31T10:49:23.22Z"),
     });
 
     const chapters = await client.query(`
-      SELECT name, decision_reason, decided_on
+      SELECT name, decision_reason, decided_on::text AS decided_on
       FROM pg_temp.cap_chapters WHERE code IN ('CAP. 16', 'CAP. 17')
       ORDER BY code
     `);
@@ -228,7 +241,7 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
     ]);
 
     const overrides = await client.query(`
-      SELECT reason, decided_on
+      SELECT reason, decided_on::text AS decided_on
       FROM pg_temp.line_chapter_overrides WHERE budget_line_code IN ('7.1', '7.2')
       ORDER BY budget_line_code
     `);
@@ -241,7 +254,7 @@ test("all seeds are insert-only, null-only backfills preserve later edits", asyn
     ]);
 
     const quote = await client.query(`
-      SELECT amount, note FROM pg_temp.budget_quotes
+      SELECT amount::text AS amount, note FROM pg_temp.budget_quotes
       WHERE note = 'Manual quote edit'
     `);
     assert.deepEqual(quote.rows[0], { amount: "4567.89", note: "Manual quote edit" });
