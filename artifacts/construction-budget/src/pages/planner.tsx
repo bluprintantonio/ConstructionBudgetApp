@@ -6,6 +6,7 @@ import {
   Check,
   CircleDollarSign,
   House,
+  Layers,
   Leaf,
   Ruler,
   Save,
@@ -77,16 +78,18 @@ const packDefinitions = [
   { id: "premium", label: "Premium" },
 ] as const;
 type PackId = (typeof packDefinitions)[number]["id"];
-const plannerViews = [
-  { id: "waterfall", label: "Cost waterfall" },
+const plannerViewActions = [
   { id: "outcomes", label: "All three pack outcomes" },
-  { id: "sale-prices", label: "Sale prices" },
+  { id: "prices", label: "Sale prices" },
 ] as const;
-type PlannerView = (typeof plannerViews)[number]["id"];
+type PlannerViewAction = (typeof plannerViewActions)[number]["id"];
+type PlannerView = "waterfall" | PlannerViewAction;
 
 function readPlannerViewFromUrl(): PlannerView {
   const view = new URLSearchParams(window.location.search).get("view");
-  return view === "outcomes" || view === "sale-prices" ? view : "waterfall";
+  if (view === "outcomes") return "outcomes";
+  if (view === "prices" || view === "sale-prices") return "prices";
+  return "waterfall";
 }
 
 type SalePriceCellDraft = {
@@ -333,11 +336,14 @@ export default function PlannerPage({
     return () => window.removeEventListener("popstate", syncViewFromUrl);
   }, []);
 
-  const chooseView = (view: PlannerView) => {
-    setSelectedView(view);
+  const toggleView = (view: PlannerViewAction) => {
+    const nextView = selectedView === view ? "waterfall" : view;
+    setSelectedView(nextView);
     const params = new URLSearchParams(window.location.search);
-    params.set("view", view);
-    void setLocation(`/planner?${params.toString()}`);
+    if (nextView === "waterfall") params.delete("view");
+    else params.set("view", nextView);
+    const query = params.toString();
+    void setLocation(`/planner${query ? `?${query}` : ""}`);
   };
 
   useEffect(() => {
@@ -513,6 +519,35 @@ export default function PlannerPage({
         : [];
     });
   }, [houseTypesQuery.data, inputsQuery.data, salePriceDrafts]);
+
+  const renderViewActionButton = (
+    view: PlannerViewAction,
+    placement: "row" | "mobile",
+  ) => {
+    const definition = plannerViewActions.find((action) => action.id === view)!;
+    const Icon = view === "outcomes" ? Layers : Target;
+    const isSelected = selectedView === view;
+    return (
+      <button
+        aria-pressed={isSelected}
+        className={`planner-view-action planner-view-action-${placement}`}
+        data-selected={isSelected}
+        data-view={view}
+        key={`${placement}-${view}`}
+        onClick={() => toggleView(view)}
+        type="button"
+      >
+        <span className="planner-view-action-icon"><Icon size={19} /></span>
+        <span className="planner-view-action-label">{definition.label}</span>
+        <span className="planner-view-action-indicators">
+          {view === "prices" && dirtySalePriceRows.length > 0 && (
+            <span className="planner-view-unsaved-dot" role="img" aria-label="Unsaved sale-price edits" />
+          )}
+          {isSelected && <Check size={15} aria-hidden="true" />}
+        </span>
+      </button>
+    );
+  };
 
   const updateSalePriceDraftCell = (
     houseTypeId: string,
@@ -743,40 +778,43 @@ export default function PlannerPage({
       {pageHeader}
       <section className="planner-choice-section" aria-label="House types">
         <div className="planner-section-caption"><span>01</span> SELECT HOUSE TYPE</div>
-        <div className="planner-house-type-tabs" role="tablist" aria-label="Choose a house type">
-          {houseTypesQuery.data?.map((houseType, index) => {
-            const Icon = houseTypeIcons[index % houseTypeIcons.length];
-            return (
-              <button
-                aria-controls="planner-house-type-panel"
-                aria-selected={selectedHouseTypeId === houseType.id}
-                className="planner-house-type-tab"
-                id={`planner-house-type-tab-${houseType.id}`}
-                key={houseType.id}
-                onClick={() => setSelectedHouseTypeId(houseType.id)}
-                onKeyDown={(event) => {
-                  const nextIndex = event.key === "ArrowRight"
-                    ? (index + 1) % houseTypesQuery.data!.length
-                    : event.key === "ArrowLeft"
-                      ? (index - 1 + houseTypesQuery.data!.length) % houseTypesQuery.data!.length
-                      : null;
-                  if (nextIndex !== null) {
-                    event.preventDefault();
-                    const nextType = houseTypesQuery.data![nextIndex];
-                    setSelectedHouseTypeId(nextType.id);
-                    document.getElementById(`planner-house-type-tab-${nextType.id}`)?.focus();
-                  }
-                }}
-                role="tab"
-                tabIndex={selectedHouseTypeId === houseType.id ? 0 : -1}
-                type="button"
-              >
-                <Icon size={20} strokeWidth={1.7} />
-                <span>{houseType.name}</span>
-                {houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL COST BASIS</small>}
-              </button>
-            );
-          })}
+        <div className="planner-choice-line">
+          <div className="planner-house-type-tabs" role="tablist" aria-label="Choose a house type">
+            {houseTypesQuery.data?.map((houseType, index) => {
+              const Icon = houseTypeIcons[index % houseTypeIcons.length];
+              return (
+                <button
+                  aria-controls="planner-house-type-panel"
+                  aria-selected={selectedHouseTypeId === houseType.id}
+                  className="planner-house-type-tab"
+                  id={`planner-house-type-tab-${houseType.id}`}
+                  key={houseType.id}
+                  onClick={() => setSelectedHouseTypeId(houseType.id)}
+                  onKeyDown={(event) => {
+                    const nextIndex = event.key === "ArrowRight"
+                      ? (index + 1) % houseTypesQuery.data!.length
+                      : event.key === "ArrowLeft"
+                        ? (index - 1 + houseTypesQuery.data!.length) % houseTypesQuery.data!.length
+                        : null;
+                    if (nextIndex !== null) {
+                      event.preventDefault();
+                      const nextType = houseTypesQuery.data![nextIndex];
+                      setSelectedHouseTypeId(nextType.id);
+                      document.getElementById(`planner-house-type-tab-${nextType.id}`)?.focus();
+                    }
+                  }}
+                  role="tab"
+                  tabIndex={selectedHouseTypeId === houseType.id ? 0 : -1}
+                  type="button"
+                >
+                  <Icon size={20} strokeWidth={1.7} />
+                  <span>{houseType.name}</span>
+                  {houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL COST BASIS</small>}
+                </button>
+              );
+            })}
+          </div>
+          {renderViewActionButton("outcomes", "row")}
         </div>
       </section>
 
@@ -788,31 +826,38 @@ export default function PlannerPage({
 
       <section className="planner-choice-section planner-pack-choice" aria-label="Estimate pack">
         <div className="planner-section-caption"><span>02</span> CHOOSE FINISHING PACK</div>
-        <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
-          {packDefinitions.map(({ id, label }) => {
-            const Icon = packIcons[id];
-            const pack = packTotals?.[id];
-            return (
-              <button
-                aria-controls="planner-panel"
-                aria-selected={selectedPack === id}
-                className="planner-pack-tab"
-                data-pack={id}
-                id={`planner-pack-tab-${id}`}
-                key={id}
-                onClick={() => setSelectedPack(id)}
-                role="tab"
-                tabIndex={selectedPack === id ? 0 : -1}
-                type="button"
-              >
-                <span className="planner-pack-card-icon"><Icon size={19} /></span>
-                <span className="planner-pack-card-copy"><strong>{label}</strong></span>
-                <b>{formatCurrency(pack?.total ?? null, currencyCode)}</b>
-              </button>
-            );
-          })}
+        <div className="planner-choice-line">
+          <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
+            {packDefinitions.map(({ id, label }) => {
+              const Icon = packIcons[id];
+              const pack = packTotals?.[id];
+              return (
+                <button
+                  aria-controls="planner-panel"
+                  aria-selected={selectedPack === id}
+                  className="planner-pack-tab"
+                  data-pack={id}
+                  id={`planner-pack-tab-${id}`}
+                  key={id}
+                  onClick={() => setSelectedPack(id)}
+                  role="tab"
+                  tabIndex={selectedPack === id ? 0 : -1}
+                  type="button"
+                >
+                  <span className="planner-pack-card-icon"><Icon size={19} /></span>
+                  <span className="planner-pack-card-copy"><strong>{label}</strong></span>
+                  <b>{formatCurrency(pack?.total ?? null, currencyCode)}</b>
+                </button>
+              );
+            })}
+          </div>
+          {renderViewActionButton("prices", "row")}
         </div>
       </section>
+
+      <div className="planner-mobile-view-actions" role="group" aria-label="Planner views">
+        {plannerViewActions.map(({ id }) => renderViewActionButton(id, "mobile"))}
+      </div>
 
       {selectedResult && selectedPresentation && selectedPackTotal && (
         <div
@@ -838,36 +883,9 @@ export default function PlannerPage({
           </section>
 
           <div className="planner-analysis-grid">
-            <div className="planner-left-column">
-              <section className="panel planner-views" aria-label="Planner views">
-                <div className="planner-section-title">
-                  <div><div className="planner-section-caption"><span>03</span> PLANNER VIEWS</div><h2>Views</h2></div>
-                </div>
-                <div className="planner-view-options" role="group" aria-label="Choose a Planner view">
-                  {plannerViews.map(({ id, label }) => (
-                    <button
-                      aria-pressed={selectedView === id}
-                      className="planner-view-button"
-                      data-selected={selectedView === id}
-                      key={id}
-                      onClick={() => chooseView(id)}
-                      type="button"
-                    >
-                      <span>{label}</span>
-                      <span className="planner-view-button-indicators">
-                        {id === "sale-prices" && dirtySalePriceRows.length > 0 && (
-                          <span className="planner-view-unsaved-dot" role="img" aria-label="Unsaved sale-price edits" />
-                        )}
-                        {selectedView === id && <Check size={15} aria-hidden="true" />}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
               <section className="planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
                 <div className="planner-section-title">
-                  <div><div className="planner-section-caption"><span>04</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
+                  <div><div className="planner-section-caption"><span>03</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
                   <span className="pill attention"><i />ASSUMPTION</span>
                 </div>
                 <form onSubmit={save}>
@@ -905,13 +923,12 @@ export default function PlannerPage({
                 {saveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{saveError}</div>}
                 {hasRequiredPriceError && <div className="inline-message" role="alert"><AlertCircle size={15} />Target margin, sales commission and taxes must total less than 100% to calculate the required sale price.</div>}
               </section>
-            </div>
 
             <div className="planner-view-host" id="planner-view-content">
               {selectedView === "waterfall" && (
                 <section className="panel planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
                   <div className="planner-card-heading">
-                    <div><div className="planner-section-caption"><span>05</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
+                    <div><div className="planner-section-caption"><span>04</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
                     <span className="planner-pack-badge" data-pack={selectedPack}>{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
                   </div>
                   {selectedPresentation.waterfallSections.map((section) => (
@@ -933,7 +950,7 @@ export default function PlannerPage({
               {selectedView === "outcomes" && (
                 <div className="planner-view-stack">
                   <section className="panel planner-comparison" aria-labelledby="planner-comparison-heading">
-                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>05</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
+                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>04</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
                     <div className="planner-comparison-grid">
                       {plannerPacks.map((pack) => (
                         <article className={`panel planner-comparison-card${pack.id === selectedPack ? " is-selected" : ""}`} data-pack={pack.id} key={pack.id}>
@@ -952,7 +969,7 @@ export default function PlannerPage({
                   </section>
 
                   <section className="panel planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
-                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>06</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
+                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>05</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
                     <div className="planner-house-type-table-wrap">
                       <table className="planner-house-type-table">
                         <thead><tr><th scope="col">House type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
@@ -974,10 +991,10 @@ export default function PlannerPage({
                 </div>
               )}
 
-              {selectedView === "sale-prices" && (
+              {selectedView === "prices" && (
                 <section className="panel planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
                   <div className="planner-sale-prices-header">
-                    <div><div className="planner-section-caption"><span>05</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
+                    <div><div className="planner-section-caption"><span>04</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
                     <span className="pill attention"><i />ASSUMPTION</span>
                   </div>
                   <form onSubmit={saveSalePrices}>
@@ -1021,7 +1038,7 @@ export default function PlannerPage({
 
           <section className="panel planner-viability" data-pack={selectedPack} aria-labelledby="planner-viability-heading">
             <div className="planner-viability-copy">
-              <div className="planner-section-caption"><span>{selectedView === "outcomes" ? "07" : "06"}</span> REFERENCE-PRICE VIABILITY</div>
+              <div className="planner-section-caption"><span>{selectedView === "outcomes" ? "06" : "05"}</span> REFERENCE-PRICE VIABILITY</div>
               <h2 id="planner-viability-heading">{formatPercent(selectedResult.netMargin)} <span>net margin</span></h2>
               <p>Reference sale price · {formatCurrency(inputsForPack(engineInputs, selectedPack).referenceSellingPrice, currencyCode)}</p>
             </div>
