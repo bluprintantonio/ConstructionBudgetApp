@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useLocation } from "wouter";
 import {
   AlertCircle,
   Building2,
@@ -76,6 +77,17 @@ const packDefinitions = [
   { id: "premium", label: "Premium" },
 ] as const;
 type PackId = (typeof packDefinitions)[number]["id"];
+const plannerViews = [
+  { id: "waterfall", label: "Cost waterfall" },
+  { id: "outcomes", label: "All three pack outcomes" },
+  { id: "sale-prices", label: "Sale prices" },
+] as const;
+type PlannerView = (typeof plannerViews)[number]["id"];
+
+function readPlannerViewFromUrl(): PlannerView {
+  const view = new URLSearchParams(window.location.search).get("view");
+  return view === "outcomes" || view === "sale-prices" ? view : "waterfall";
+}
 
 type SalePriceCellDraft = {
   price: string;
@@ -302,6 +314,7 @@ export default function PlannerPage({
   const updateInputs = useUpdatePlannerInputs();
   const updateSalePrices = useUpdatePlannerSalePrices();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [draft, setDraft] = useState<PlannerDraft>(emptyDraft);
   const [landNote, setLandNote] = useState("");
   const [notice, setNotice] = useState("");
@@ -311,7 +324,21 @@ export default function PlannerPage({
   const [salePriceSaveError, setSalePriceSaveError] = useState("");
   const [selectedHouseTypeId, setSelectedHouseTypeId] = useState("");
   const [selectedPack, setSelectedPack] = useState<PackId>("standard");
+  const [selectedView, setSelectedView] = useState<PlannerView>(readPlannerViewFromUrl);
   const hydratedHouseTypeId = useRef("");
+
+  useEffect(() => {
+    const syncViewFromUrl = () => setSelectedView(readPlannerViewFromUrl());
+    window.addEventListener("popstate", syncViewFromUrl);
+    return () => window.removeEventListener("popstate", syncViewFromUrl);
+  }, []);
+
+  const chooseView = (view: PlannerView) => {
+    setSelectedView(view);
+    const params = new URLSearchParams(window.location.search);
+    params.set("view", view);
+    void setLocation(`/planner?${params.toString()}`);
+  };
 
   useEffect(() => {
     const houseTypes = houseTypesQuery.data;
@@ -811,71 +838,190 @@ export default function PlannerPage({
           </section>
 
           <div className="planner-analysis-grid">
-            <section className="planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
-              <div className="planner-section-title">
-                <div><div className="planner-section-caption"><span>03</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
-                <span className="pill attention"><i />ASSUMPTION</span>
-              </div>
-              <form onSubmit={save}>
-                <div className="planner-assumption-groups">
-                  {assumptionGroups.map(({ title, keys, icon: Icon }) => (
-                    <section className="planner-assumption-card" key={title}>
-                      <h3><Icon size={16} />{title}</h3>
-                      {keys.map(fieldInput)}
-                      {title === "Land & planning" && (
-                        <label className="planner-assumption-field planner-note-field">
-                          <span className="planner-assumption-label">Land source note</span>
-                          <input
-                            aria-label="Land source note"
-                            type="text"
-                            value={landNote}
-                            onChange={(event) => {
-                              setLandNote(event.target.value);
-                              setNotice("");
-                              setSaveError("");
-                            }}
-                          />
-                        </label>
-                      )}
-                    </section>
+            <div className="planner-left-column">
+              <section className="panel planner-views" aria-label="Planner views">
+                <div className="planner-section-title">
+                  <div><div className="planner-section-caption"><span>03</span> PLANNER VIEWS</div><h2>Views</h2></div>
+                </div>
+                <div className="planner-view-options" role="group" aria-label="Choose a Planner view">
+                  {plannerViews.map(({ id, label }) => (
+                    <button
+                      aria-pressed={selectedView === id}
+                      className="planner-view-button"
+                      data-selected={selectedView === id}
+                      key={id}
+                      onClick={() => chooseView(id)}
+                      type="button"
+                    >
+                      <span>{label}</span>
+                      <span className="planner-view-button-indicators">
+                        {id === "sale-prices" && dirtySalePriceRows.length > 0 && (
+                          <span className="planner-view-unsaved-dot" role="img" aria-label="Unsaved sale-price edits" />
+                        )}
+                        {selectedView === id && <Check size={15} aria-hidden="true" />}
+                      </span>
+                    </button>
                   ))}
                 </div>
-                <div className="planner-form-footer">
-                  <span>Saved per house type · one house unit</span>
-                  <button className="button button-primary" type="submit" disabled={updateInputs.isPending}>
-                    <Save size={14} />{updateInputs.isPending ? "Saving…" : "Save assumptions"}
-                  </button>
-                </div>
-              </form>
-              {notice && <div className="inline-message" role="status"><Check size={15} />{notice}</div>}
-              {saveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{saveError}</div>}
-              {hasRequiredPriceError && <div className="inline-message" role="alert"><AlertCircle size={15} />Target margin, sales commission and taxes must total less than 100% to calculate the required sale price.</div>}
-            </section>
+              </section>
 
-            <section className="panel planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
-              <div className="planner-card-heading">
-                <div><div className="planner-section-caption"><span>04</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
-                <span className="planner-pack-badge" data-pack={selectedPack}>{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
-              </div>
-              {selectedPresentation.waterfallSections.map((section) => (
-                <div className="planner-waterfall-section" key={section.id}>
-                  <h3>{section.title}</h3>
-                  {section.rows.map((row) => (
-                    <div className={`planner-waterfall-row${row.id.endsWith("total") || row.id === "net-profit" ? " is-total" : ""}${row.isNegative ? " is-negative" : ""}`} key={row.id}>
-                      <span className="planner-waterfall-label">{row.label}</span>
-                      <strong className="planner-waterfall-amount">{formatCurrency(row.amount, currencyCode)}</strong>
-                      <span className="planner-waterfall-percent">{formatPercent(row.percentOfReferencePrice)}</span>
-                      {row.barWidthPercent !== null && <div className="planner-waterfall-track" aria-hidden="true"><span className="planner-waterfall-fill" style={{ width: `${row.barWidthPercent}%` }} /></div>}
+              <section className="planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
+                <div className="planner-section-title">
+                  <div><div className="planner-section-caption"><span>04</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
+                  <span className="pill attention"><i />ASSUMPTION</span>
+                </div>
+                <form onSubmit={save}>
+                  <div className="planner-assumption-groups">
+                    {assumptionGroups.map(({ title, keys, icon: Icon }) => (
+                      <section className="planner-assumption-card" key={title}>
+                        <h3><Icon size={16} />{title}</h3>
+                        {keys.map(fieldInput)}
+                        {title === "Land & planning" && (
+                          <label className="planner-assumption-field planner-note-field">
+                            <span className="planner-assumption-label">Land source note</span>
+                            <input
+                              aria-label="Land source note"
+                              type="text"
+                              value={landNote}
+                              onChange={(event) => {
+                                setLandNote(event.target.value);
+                                setNotice("");
+                                setSaveError("");
+                              }}
+                            />
+                          </label>
+                        )}
+                      </section>
+                    ))}
+                  </div>
+                  <div className="planner-form-footer">
+                    <span>Saved per house type · one house unit</span>
+                    <button className="button button-primary" type="submit" disabled={updateInputs.isPending}>
+                      <Save size={14} />{updateInputs.isPending ? "Saving…" : "Save assumptions"}
+                    </button>
+                  </div>
+                </form>
+                {notice && <div className="inline-message" role="status"><Check size={15} />{notice}</div>}
+                {saveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{saveError}</div>}
+                {hasRequiredPriceError && <div className="inline-message" role="alert"><AlertCircle size={15} />Target margin, sales commission and taxes must total less than 100% to calculate the required sale price.</div>}
+              </section>
+            </div>
+
+            <div className="planner-view-host" id="planner-view-content">
+              {selectedView === "waterfall" && (
+                <section className="panel planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
+                  <div className="planner-card-heading">
+                    <div><div className="planner-section-caption"><span>05</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
+                    <span className="planner-pack-badge" data-pack={selectedPack}>{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
+                  </div>
+                  {selectedPresentation.waterfallSections.map((section) => (
+                    <div className="planner-waterfall-section" key={section.id}>
+                      <h3>{section.title}</h3>
+                      {section.rows.map((row) => (
+                        <div className={`planner-waterfall-row${row.id.endsWith("total") || row.id === "net-profit" ? " is-total" : ""}${row.isNegative ? " is-negative" : ""}`} key={row.id}>
+                          <span className="planner-waterfall-label">{row.label}</span>
+                          <strong className="planner-waterfall-amount">{formatCurrency(row.amount, currencyCode)}</strong>
+                          <span className="planner-waterfall-percent">{formatPercent(row.percentOfReferencePrice)}</span>
+                          {row.barWidthPercent !== null && <div className="planner-waterfall-track" aria-hidden="true"><span className="planner-waterfall-fill" style={{ width: `${row.barWidthPercent}%` }} /></div>}
+                        </div>
+                      ))}
                     </div>
                   ))}
+                </section>
+              )}
+
+              {selectedView === "outcomes" && (
+                <div className="planner-view-stack">
+                  <section className="panel planner-comparison" aria-labelledby="planner-comparison-heading">
+                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>05</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
+                    <div className="planner-comparison-grid">
+                      {plannerPacks.map((pack) => (
+                        <article className={`panel planner-comparison-card${pack.id === selectedPack ? " is-selected" : ""}`} data-pack={pack.id} key={pack.id}>
+                          <div className="planner-comparison-heading"><div><div className="eyebrow">CONSTRUCTION COST</div><h3>{pack.label}</h3></div><strong>{formatCurrency(pack.packTotal.total, currencyCode)}</strong></div>
+                          <div className="planner-comparison-values">
+                            <div><span>Sale price used</span><strong>{formatCurrency(inputsForPack(engineInputs, pack.id).referenceSellingPrice, currencyCode)}</strong></div>
+                            <div><span>Development cost</span><strong>{formatCurrency(pack.result.developmentCost, currencyCode)}</strong></div>
+                            <div><span>Required sale price</span><strong>{pack.result.requiredSalePriceError ? "—" : formatCurrency(pack.result.requiredSalePrice, currencyCode)}</strong></div>
+                            <div><span>Net profit</span><strong>{formatCurrency(pack.result.netProfit, currencyCode)}</strong></div>
+                            <div><span>Net margin</span><strong>{formatPercent(pack.result.netMargin)}</strong></div>
+                            <div><span>ROI</span><strong>{formatPercent(pack.result.roi)}</strong></div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="panel planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
+                    <div className="planner-section-title"><div><div className="planner-section-caption"><span>06</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
+                    <div className="planner-house-type-table-wrap">
+                      <table className="planner-house-type-table">
+                        <thead><tr><th scope="col">House type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
+                        <tbody>
+                          {comparisonRows.map((row) => (
+                            <tr className={row.id === selectedHouseTypeId ? "is-selected" : ""} key={row.id}>
+                              <th scope="row"><div className="planner-house-type-name"><span>{row.name}</span>{row.costBasis === "Twin CSV (provisional)" && <span className="pill attention"><i />PROVISIONAL</span>}</div></th>
+                              <td>{formatCurrency(row.land, currencyCode)}</td>
+                              {packDefinitions.map(({ id }) => {
+                                const metrics = row[id];
+                                return <td key={id}><div className="planner-house-type-pack-metrics"><span><em>Net profit</em><strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong></span><span><em>Net margin</em><strong>{formatPercent(metrics.netMargin)}</strong></span><span><em>ROI</em><strong>{formatPercent(metrics.roi)}</strong></span></div></td>;
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
                 </div>
-              ))}
-            </section>
+              )}
+
+              {selectedView === "sale-prices" && (
+                <section className="panel planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
+                  <div className="planner-sale-prices-header">
+                    <div><div className="planner-section-caption"><span>05</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
+                    <span className="pill attention"><i />ASSUMPTION</span>
+                  </div>
+                  <form onSubmit={saveSalePrices}>
+                    <div className="planner-sale-price-table-wrap">
+                      <table className="planner-sale-price-table">
+                        <thead><tr><th scope="col">House type</th>{packDefinitions.map(({ id, label }) => <th scope="col" key={id}>{label}</th>)}</tr></thead>
+                        <tbody>
+                          {salePriceMatrixRows.map(({ houseType, saved, salePrices, metrics }) => (
+                            <tr key={houseType.id}>
+                              <th scope="row"><span>{houseType.name}</span>{houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL</small>}</th>
+                              {packDefinitions.map(({ id, label }) => {
+                                const cell = salePrices[id];
+                                const dirty = salePriceCellIsDirty(cell, saved, id);
+                                return (
+                                  <td key={id}>
+                                    <div className="planner-sale-price-cell">
+                                      <label className="planner-sale-price-input-label"><span className="sr-only">{houseType.name} {label} sale price</span><span className="planner-sale-currency">{currencyCode === "EUR" ? "€" : currencyCode === "GBP" ? "£" : "$"}</span><input type="number" min="0" step="0.01" value={cell.price} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "price", event.target.value)} /></label>
+                                      <label className="planner-sale-price-note-label"><span className="sr-only">{houseType.name} {label} price source note</span><input type="text" placeholder="Estimate, comparable sale, offer received" value={cell.note} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "note", event.target.value)} /></label>
+                                      {dirty && <span className="planner-sale-price-unsaved">Unsaved</span>}
+                                      <div className="planner-sale-price-metrics">
+                                        <span>ROI<strong>{formatPercent(metrics[id].roi)}</strong>{houseType.costBasis === "Twin CSV (provisional)" && <span className="pill attention planner-provisional-roi"><i />PROVISIONAL</span>}</span>
+                                        <span>Sale price / m²<strong>{formatCurrency(metrics[id].salePricePerSquareMeter, currencyCode)}</strong></span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {salePriceNotice && <div className="inline-message" role="status"><Check size={15} />{salePriceNotice}</div>}
+                    {salePriceSaveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{salePriceSaveError}</div>}
+                    <div className="form-actions planner-sale-price-actions"><button className="button button-primary" type="submit" disabled={updateSalePrices.isPending || dirtySalePriceRows.length === 0}><Save size={14} />{updateSalePrices.isPending ? "Saving…" : "Save sale prices"}</button></div>
+                  </form>
+                </section>
+              )}
+            </div>
           </div>
 
           <section className="panel planner-viability" data-pack={selectedPack} aria-labelledby="planner-viability-heading">
             <div className="planner-viability-copy">
-              <div className="planner-section-caption"><span>05</span> REFERENCE-PRICE VIABILITY</div>
+              <div className="planner-section-caption"><span>{selectedView === "outcomes" ? "07" : "06"}</span> REFERENCE-PRICE VIABILITY</div>
               <h2 id="planner-viability-heading">{formatPercent(selectedResult.netMargin)} <span>net margin</span></h2>
               <p>Reference sale price · {formatCurrency(inputsForPack(engineInputs, selectedPack).referenceSellingPrice, currencyCode)}</p>
             </div>
@@ -899,89 +1045,8 @@ export default function PlannerPage({
               <div className="planner-assumption-warning"><AlertCircle size={14} />Reference price is an assumption</div>
             </div>
           </section>
-
-          <section className="planner-comparison" aria-labelledby="planner-comparison-heading">
-            <div className="planner-section-title"><div><div className="planner-section-caption"><span>06</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
-            <div className="planner-comparison-grid">
-              {plannerPacks.map((pack) => (
-                <article className={`panel planner-comparison-card${pack.id === selectedPack ? " is-selected" : ""}`} data-pack={pack.id} key={pack.id}>
-                  <div className="planner-comparison-heading"><div><div className="eyebrow">CONSTRUCTION COST</div><h3>{pack.label}</h3></div><strong>{formatCurrency(pack.packTotal.total, currencyCode)}</strong></div>
-                  <div className="planner-comparison-values">
-                    <div><span>Sale price used</span><strong>{formatCurrency(inputsForPack(engineInputs, pack.id).referenceSellingPrice, currencyCode)}</strong></div>
-                    <div><span>Development cost</span><strong>{formatCurrency(pack.result.developmentCost, currencyCode)}</strong></div>
-                    <div><span>Required sale price</span><strong>{pack.result.requiredSalePriceError ? "—" : formatCurrency(pack.result.requiredSalePrice, currencyCode)}</strong></div>
-                    <div><span>Net profit</span><strong>{formatCurrency(pack.result.netProfit, currencyCode)}</strong></div>
-                    <div><span>Net margin</span><strong>{formatPercent(pack.result.netMargin)}</strong></div>
-                    <div><span>ROI</span><strong>{formatPercent(pack.result.roi)}</strong></div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         </div>
       )}
-
-      <section className="panel planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
-        <div className="planner-sale-prices-header">
-          <div><div className="planner-section-caption"><span>07</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
-          <span className="pill attention"><i />ASSUMPTION</span>
-        </div>
-        <form onSubmit={saveSalePrices}>
-          <div className="planner-sale-price-table-wrap">
-            <table className="planner-sale-price-table">
-              <thead><tr><th scope="col">House type</th>{packDefinitions.map(({ id, label }) => <th scope="col" key={id}>{label}</th>)}</tr></thead>
-              <tbody>
-                {salePriceMatrixRows.map(({ houseType, saved, salePrices, metrics }) => (
-                  <tr key={houseType.id}>
-                    <th scope="row"><span>{houseType.name}</span>{houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL</small>}</th>
-                    {packDefinitions.map(({ id, label }) => {
-                      const cell = salePrices[id];
-                      const dirty = salePriceCellIsDirty(cell, saved, id);
-                      return (
-                        <td key={id}>
-                          <div className="planner-sale-price-cell">
-                            <label className="planner-sale-price-input-label"><span className="sr-only">{houseType.name} {label} sale price</span><span className="planner-sale-currency">{currencyCode === "EUR" ? "€" : currencyCode === "GBP" ? "£" : "$"}</span><input type="number" min="0" step="0.01" value={cell.price} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "price", event.target.value)} /></label>
-                            <label className="planner-sale-price-note-label"><span className="sr-only">{houseType.name} {label} price source note</span><input type="text" placeholder="Estimate, comparable sale, offer received" value={cell.note} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "note", event.target.value)} /></label>
-                            {dirty && <span className="planner-sale-price-unsaved">Unsaved</span>}
-                            <div className="planner-sale-price-metrics">
-                              <span>ROI<strong>{formatPercent(metrics[id].roi)}</strong>{houseType.costBasis === "Twin CSV (provisional)" && <span className="pill attention planner-provisional-roi"><i />PROVISIONAL</span>}</span>
-                              <span>Sale price / m²<strong>{formatCurrency(metrics[id].salePricePerSquareMeter, currencyCode)}</strong></span>
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {salePriceNotice && <div className="inline-message" role="status"><Check size={15} />{salePriceNotice}</div>}
-          {salePriceSaveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{salePriceSaveError}</div>}
-          <div className="form-actions planner-sale-price-actions"><button className="button button-primary" type="submit" disabled={updateSalePrices.isPending || dirtySalePriceRows.length === 0}><Save size={14} />{updateSalePrices.isPending ? "Saving…" : "Save sale prices"}</button></div>
-        </form>
-      </section>
-
-      <section className="panel planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
-        <div className="planner-section-title"><div><div className="planner-section-caption"><span>08</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
-        <div className="planner-house-type-table-wrap">
-          <table className="planner-house-type-table">
-            <thead><tr><th scope="col">House type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
-            <tbody>
-              {comparisonRows.map((row) => (
-                <tr className={row.id === selectedHouseTypeId ? "is-selected" : ""} key={row.id}>
-                  <th scope="row"><div className="planner-house-type-name"><span>{row.name}</span>{row.costBasis === "Twin CSV (provisional)" && <span className="pill attention"><i />PROVISIONAL</span>}</div></th>
-                  <td>{formatCurrency(row.land, currencyCode)}</td>
-                  {packDefinitions.map(({ id }) => {
-                    const metrics = row[id];
-                    return <td key={id}><div className="planner-house-type-pack-metrics"><span><em>Net profit</em><strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong></span><span><em>Net margin</em><strong>{formatPercent(metrics.netMargin)}</strong></span><span><em>ROI</em><strong>{formatPercent(metrics.roi)}</strong></span></div></td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }

@@ -1553,6 +1553,40 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-house-type-pack-metrics strong { color: var(--app-text); font: 9px var(--app-font-mono); }
 .planner-page button:focus-visible,
 .planner-page input:focus-visible { outline: 2px solid var(--app-warning); outline-offset: 2px; }
+.planner-page .planner-left-column { display: grid; min-width: 0; align-content: start; gap: 12px; }
+.planner-page .planner-views { min-width: 0; padding: 16px; }
+.planner-page .planner-views .planner-section-title { margin-bottom: 12px; }
+.planner-page .planner-view-options { display: grid; gap: 7px; }
+.planner-page .planner-view-button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-8);
+  color: var(--app-text);
+  background: var(--app-surface);
+  font: 600 11px var(--app-font-display);
+  text-align: left;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.planner-page .planner-view-button:hover { border-color: var(--app-gold); transform: translateY(-1px); }
+.planner-page .planner-view-button[data-selected="true"] {
+  border-color: var(--app-gold);
+  color: var(--app-navy);
+  background: var(--app-standard-tint);
+  box-shadow: var(--app-shadow-soft);
+}
+.planner-page .planner-view-button-indicators { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: var(--app-warning); }
+.planner-page .planner-view-unsaved-dot { width: 7px; height: 7px; border-radius: var(--app-radius-round); background: var(--app-warning); }
+.planner-page .planner-view-host { display: grid; min-width: 0; align-content: start; gap: 12px; }
+.planner-page .planner-view-host > * { min-width: 0; }
+.planner-page .planner-view-stack { display: grid; min-width: 0; gap: 12px; }
+.planner-page .planner-view-stack > .panel { min-width: 0; }
 @media (max-width: 1000px) {
   .planner-page .planner-analysis-grid { grid-template-columns: minmax(0,1fr) minmax(0,1.2fr); }
   .planner-page .planner-kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -1569,7 +1603,14 @@ a { color: inherit; text-decoration: none; }
   .planner-page .planner-kpi-grid { gap: 8px; }
   .planner-page .planner-kpi { padding: 11px; }
   .planner-page .planner-kpi-value { font-size: clamp(16px,5vw,21px); }
-  .planner-page .planner-analysis-grid { grid-template-columns: 1fr; }
+  .planner-page .planner-analysis-grid { grid-template-columns: minmax(0,1fr); }
+  .planner-page .planner-left-column { display: contents; }
+  .planner-page .planner-views { grid-row: 1; }
+  .planner-page .planner-view-host { grid-row: 2; }
+  .planner-page .planner-assumptions { grid-row: 3; }
+  .planner-page .planner-view-options { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+  .planner-page .planner-view-button { min-height: 46px; justify-content: center; padding: 8px 6px; font-size: 9px; text-align: center; }
+  .planner-page .planner-view-button-indicators { gap: 4px; }
   .planner-page .planner-assumptions,
   .planner-page .planner-waterfall,
   .planner-page .planner-sale-prices,
