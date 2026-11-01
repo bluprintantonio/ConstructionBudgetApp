@@ -972,7 +972,7 @@ export default function PlannerPage({
                     <div className="planner-section-title"><div><div className="planner-section-caption"><span>05</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
                     <div className="planner-house-type-table-wrap">
                       <table className="planner-house-type-table">
-                        <thead><tr><th scope="col">House type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
+                        <thead><tr><th scope="col">Type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
                         <tbody>
                           {comparisonRows.map((row) => (
                             <tr className={row.id === selectedHouseTypeId ? "is-selected" : ""} key={row.id}>
@@ -980,7 +980,7 @@ export default function PlannerPage({
                               <td>{formatCurrency(row.land, currencyCode)}</td>
                               {packDefinitions.map(({ id }) => {
                                 const metrics = row[id];
-                                return <td key={id}><div className="planner-house-type-pack-metrics"><span><em>Net profit</em><strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong></span><span><em>Net margin</em><strong>{formatPercent(metrics.netMargin)}</strong></span><span><em>ROI</em><strong>{formatPercent(metrics.roi)}</strong></span></div></td>;
+                                return <td key={id}><div className="planner-house-type-pack-metrics"><span><em>Profit</em><strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong></span><span><em>Margin</em><strong>{formatPercent(metrics.netMargin)}</strong></span><span><em>ROI</em><strong>{formatPercent(metrics.roi)}</strong></span></div></td>;
                               })}
                             </tr>
                           ))}
