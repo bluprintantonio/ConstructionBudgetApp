@@ -25,10 +25,12 @@ import {
 import { calculatePackTotals } from '@workspace/engine/packs';
 import { calculateQuoteComparisons, type QuoteWarnings } from '@workspace/engine/quotes';
 import PlannerPage from './pages/planner';
+import { branding } from './config/branding';
 
 const queryClient = new QueryClient();
 const quoteStatuses = Object.values(BudgetQuoteStatus);
 const documentTypes = Object.values(BudgetQuoteDocumentType);
+const hasMultipleProjects = false;
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/budget', label: 'Materials map', icon: ClipboardList },
@@ -214,17 +216,20 @@ function Shell({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const { currencyCode, setCurrencyCode } = useCurrency();
+  useEffect(() => {
+    document.title = `${branding.brandName} · ${branding.projectName}`;
+  }, []);
   return <div className="grain min-h-[100dvh]">
     <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
       <div className="brand">
         <div className="brand-mark"><HardHat size={19} strokeWidth={2.2} /></div>
-        <div><strong>FIELDNOTES</strong><span>HOME PROJECT</span></div>
+        <div><strong>{branding.brandName}</strong></div>
         <button className="mobile-close" aria-label="Close navigation" onClick={() => setMobileNav(false)}><X size={18}/></button>
       </div>
       <div className="project-switch">
-        <div className="project-monogram">H</div>
-        <div className="project-name"><small>ACTIVE PROJECT</small><strong>Home project</strong></div>
-        <ChevronDown size={15}/>
+        <div className="project-monogram">{branding.projectInitial}</div>
+        <div className="project-name"><strong>{branding.projectName}</strong></div>
+        {hasMultipleProjects && <ChevronDown size={15}/>}
       </div>
       <div className="nav-caption">WORKSPACE</div>
       <nav className="nav-list">
@@ -235,14 +240,14 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="sidebar-bottom">
         <div className="sidebar-note"><div className="note-icon"><ShieldCheck size={16}/></div><div><strong>One source of truth</strong><p>Every figure stays tied to its source.</p></div></div>
         <div className="sidebar-settings"><Settings2 size={16}/> Workspace settings</div>
-        <div className="profile"><div className="avatar">HP</div><div><strong>Project owner</strong><span>Homeowner</span></div><MoreHorizontal size={18}/></div>
+        <div className="profile"><div className="avatar">HP</div><div><strong>{branding.userName}</strong><span>{branding.userRole}</span></div><MoreHorizontal size={18}/></div>
       </div>
     </aside>
     {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)} aria-label="Close menu"/>}
     <main className="main-area">
       <header className="topbar">
         <button className="menu-toggle" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={20}/></button>
-        <div className="breadcrumbs"><span>Home project</span><span className="slash">/</span><b>{navItems.find(i => i.href === location)?.label || 'Overview'}</b></div>
+        <div className="breadcrumbs"><b>{navItems.find(i => i.href === location)?.label || 'Overview'}</b></div>
         <div className="topbar-right"><span className="sync-state"><span className="sync-dot"/>Working copy</span><label className="currency-control"><span>Display currency</span><select aria-label="Display currency" data-testid="select-display-currency" value={currencyCode} onChange={event => setCurrencyCode(event.target.value as CurrencyCode)}><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label><button className="icon-button" aria-label="Help" onClick={() => setHelpOpen(true)}><CircleHelp size={18}/></button><div className="top-avatar">HP</div></div>
       </header>
       <div className="page-content">{children}</div>
