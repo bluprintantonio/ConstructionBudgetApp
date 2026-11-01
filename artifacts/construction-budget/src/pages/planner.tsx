@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, Check, Save } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  Check,
+  CircleDollarSign,
+  House,
+  Leaf,
+  Ruler,
+  Save,
+  Sparkles,
+  Target,
+  Zap,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetPlannerInputsQueryKey,
@@ -587,16 +599,16 @@ export default function PlannerPage({
   };
 
   const pageHeader = (
-    <div className="page-heading fade-up">
-      <div>
-        <div className="eyebrow">
-          WORKSPACE / {selectedHouseType?.name.toUpperCase() ?? "HOUSE TYPE"} · ONE HOUSE UNIT
-        </div>
-        <h1>Planner</h1>
+    <div className="planner-hero fade-up">
+      <div className="planner-hero-copy">
+        <div className="planner-hero-eyebrow">FONTAINHAS VILLAGE · DEVELOPMENT MODEL</div>
+        <h1>Planner <span>· {selectedHouseType?.name ?? "House type"}</span></h1>
         <p>
-          Compare the three pack outcomes for {selectedHouseType?.name ?? "this type"} using its saved assumptions.
+          Compare the three pack outcomes for{" "}
+          {selectedHouseType?.name ?? "this type"} using its saved assumptions.
         </p>
       </div>
+      <div className="planner-hero-mark" aria-hidden="true"><House size={27} strokeWidth={1.5} /></div>
     </div>
   );
 
@@ -607,7 +619,7 @@ export default function PlannerPage({
     extrasQuery.isLoading
   ) {
     return (
-      <div>
+      <div className="planner-page">
         {pageHeader}
         <div className="metric-placeholder">Loading planner inputs and pack totals…</div>
       </div>
@@ -621,7 +633,7 @@ export default function PlannerPage({
     extrasQuery.isError
   ) {
     return (
-      <div>
+      <div className="planner-page">
         {pageHeader}
         <div className="inline-message" role="alert">
           <AlertCircle size={15} />
@@ -648,100 +660,292 @@ export default function PlannerPage({
     (pack) => pack.result.requiredSalePriceError,
   );
 
+  const houseTypeIcons = [House, Building2, Sparkles];
+  const packIcons = { standard: Sparkles, eco: Leaf, premium: Zap };
+  const assumptionGroups: { title: string; keys: PlannerField[]; icon: typeof House }[] = [
+    { title: "House profile", keys: ["grossArea"], icon: Ruler },
+    { title: "Land & planning", keys: ["land", "designLicensing"], icon: Building2 },
+    { title: "Fees & reserves", keys: ["managementPercent", "contingencyPercent"], icon: CircleDollarSign },
+    { title: "Sale assumptions", keys: ["targetNetMarginPercent", "salesCommissionPercent", "taxesPercent"], icon: Target },
+  ];
+  const amountForField = (key: PlannerField) => {
+    if (key === "managementPercent") return selectedResult?.managementFee ?? null;
+    if (key === "contingencyPercent") return selectedResult?.contingency ?? null;
+    if (key === "salesCommissionPercent") {
+      return selectedPresentation?.commissionAtReferencePrice ?? null;
+    }
+    if (key === "taxesPercent") {
+      return selectedPresentation?.taxesAtReferencePrice ?? null;
+    }
+    return null;
+  };
+  const showComputedAmount = (key: PlannerField) =>
+    key === "managementPercent" ||
+    key === "contingencyPercent" ||
+    key === "salesCommissionPercent" ||
+    key === "taxesPercent";
+  const fieldInput = (key: PlannerField) => {
+    const definition = fieldDefinitions.find((field) => field.key === key)!;
+    const isPercent = key.endsWith("Percent");
+    return (
+      <label className="planner-assumption-field" key={key}>
+        <span className="planner-assumption-label">{definition.label}<small>ASSUMPTION</small></span>
+        <div className="planner-input-line">
+          <span className="planner-input-prefix">{isPercent ? "%" : key === "grossArea" ? "m²" : "€"}</span>
+          <input
+            aria-label={definition.label}
+            type="number"
+            step={definition.step}
+            value={draft[key]}
+            onChange={(event) => {
+              setDraft((current) => ({ ...current, [key]: event.target.value }));
+              setNotice("");
+              setSaveError("");
+            }}
+          />
+          {showComputedAmount(key) && (
+            <strong className="planner-computed-amount">{formatCurrency(amountForField(key), currencyCode)}</strong>
+          )}
+        </div>
+      </label>
+    );
+  };
+
   return (
     <div className="planner-page">
       {pageHeader}
+      <section className="planner-choice-section" aria-label="House types">
+        <div className="planner-section-caption"><span>01</span> SELECT HOUSE TYPE</div>
+        <div className="planner-house-type-tabs" role="tablist" aria-label="Choose a house type">
+          {houseTypesQuery.data?.map((houseType, index) => {
+            const Icon = houseTypeIcons[index % houseTypeIcons.length];
+            return (
+              <button
+                aria-controls="planner-house-type-panel"
+                aria-selected={selectedHouseTypeId === houseType.id}
+                className="planner-house-type-tab"
+                id={`planner-house-type-tab-${houseType.id}`}
+                key={houseType.id}
+                onClick={() => setSelectedHouseTypeId(houseType.id)}
+                onKeyDown={(event) => {
+                  const nextIndex = event.key === "ArrowRight"
+                    ? (index + 1) % houseTypesQuery.data!.length
+                    : event.key === "ArrowLeft"
+                      ? (index - 1 + houseTypesQuery.data!.length) % houseTypesQuery.data!.length
+                      : null;
+                  if (nextIndex !== null) {
+                    event.preventDefault();
+                    const nextType = houseTypesQuery.data![nextIndex];
+                    setSelectedHouseTypeId(nextType.id);
+                    document.getElementById(`planner-house-type-tab-${nextType.id}`)?.focus();
+                  }
+                }}
+                role="tab"
+                tabIndex={selectedHouseTypeId === houseType.id ? 0 : -1}
+                type="button"
+              >
+                <Icon size={20} strokeWidth={1.7} />
+                <span>{houseType.name}</span>
+                {houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL COST BASIS</small>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
-      <section
-        className="panel planner-sale-prices"
-        aria-labelledby="planner-sale-prices-heading"
-      >
-        <div className="planner-sale-prices-header">
-          <div>
-            <div className="eyebrow">SALE PRICES</div>
-            <h2 id="planner-sale-prices-heading">Sale prices</h2>
-            <p>One house unit · add a note describing the price source.</p>
+      {selectedHouseType?.costBasis === "Twin CSV (provisional)" && (
+        <div className="planner-provisional-banner" role="note">
+          Costs for this type use the Twin CSV (provisional). Import a type-specific CSV to change this.
+        </div>
+      )}
+
+      <section className="planner-choice-section planner-pack-choice" aria-label="Estimate pack">
+        <div className="planner-section-caption"><span>02</span> CHOOSE FINISHING PACK</div>
+        <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
+          {packDefinitions.map(({ id, label }) => {
+            const Icon = packIcons[id];
+            const pack = packTotals?.[id];
+            return (
+              <button
+                aria-controls="planner-panel"
+                aria-selected={selectedPack === id}
+                className="planner-pack-tab"
+                data-pack={id}
+                id={`planner-pack-tab-${id}`}
+                key={id}
+                onClick={() => setSelectedPack(id)}
+                role="tab"
+                tabIndex={selectedPack === id ? 0 : -1}
+                type="button"
+              >
+                <span className="planner-pack-card-icon"><Icon size={19} /></span>
+                <span className="planner-pack-card-copy"><strong>{label}</strong></span>
+                <b>{formatCurrency(pack?.total ?? null, currencyCode)}</b>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {selectedResult && selectedPresentation && selectedPackTotal && (
+        <div
+          aria-labelledby={`planner-pack-tab-${selectedPack}`}
+          className="planner-panel"
+          id="planner-panel"
+          role="tabpanel"
+        >
+          <section className="planner-kpi-grid" aria-label={`${packDefinitions.find((pack) => pack.id === selectedPack)?.label} pack key figures`} data-pack={selectedPack}>
+            {[
+              { label: "Development cost / m²", value: formatCurrency(selectedResult.costPerSquareMeter, currencyCode), icon: Building2, detail: "Total cost per gross area" },
+              { label: "Required sale price / m²", value: selectedResult.requiredSalePriceError ? "—" : formatCurrency(selectedPresentation.requiredSalePricePerSquareMeter, currencyCode), icon: Target, detail: "To reach the target margin" },
+              { label: "Net profit", value: formatCurrency(selectedResult.netProfit, currencyCode), icon: CircleDollarSign, detail: "At saved reference price" },
+              { label: "ROI", value: formatPercent(selectedResult.roi), icon: Sparkles, detail: "At saved reference price" },
+            ].map(({ label, value, icon: Icon, detail }) => (
+              <article className="planner-kpi" data-pack={selectedPack} key={label}>
+                <div className="planner-kpi-icon"><Icon size={18} /></div>
+                <span className="planner-kpi-label">{label}</span>
+                <strong className="planner-kpi-value">{value}</strong>
+                <small>{detail}</small>
+              </article>
+            ))}
+          </section>
+
+          <div className="planner-analysis-grid">
+            <section className="planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
+              <div className="planner-section-title">
+                <div><div className="planner-section-caption"><span>03</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
+                <span className="pill attention"><i />ASSUMPTION</span>
+              </div>
+              <form onSubmit={save}>
+                <div className="planner-assumption-groups">
+                  {assumptionGroups.map(({ title, keys, icon: Icon }) => (
+                    <section className="planner-assumption-card" key={title}>
+                      <h3><Icon size={16} />{title}</h3>
+                      {keys.map(fieldInput)}
+                      {title === "Land & planning" && (
+                        <label className="planner-assumption-field planner-note-field">
+                          <span className="planner-assumption-label">Land source note</span>
+                          <input
+                            aria-label="Land source note"
+                            type="text"
+                            value={landNote}
+                            onChange={(event) => {
+                              setLandNote(event.target.value);
+                              setNotice("");
+                              setSaveError("");
+                            }}
+                          />
+                        </label>
+                      )}
+                    </section>
+                  ))}
+                </div>
+                <div className="planner-form-footer">
+                  <span>Saved per house type · one house unit</span>
+                  <button className="button button-primary" type="submit" disabled={updateInputs.isPending}>
+                    <Save size={14} />{updateInputs.isPending ? "Saving…" : "Save assumptions"}
+                  </button>
+                </div>
+              </form>
+              {notice && <div className="inline-message" role="status"><Check size={15} />{notice}</div>}
+              {saveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{saveError}</div>}
+              {hasRequiredPriceError && <div className="inline-message" role="alert"><AlertCircle size={15} />Target margin, sales commission and taxes must total less than 100% to calculate the required sale price.</div>}
+            </section>
+
+            <section className="panel planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
+              <div className="planner-card-heading">
+                <div><div className="planner-section-caption"><span>04</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
+                <span className="planner-pack-badge" data-pack={selectedPack}>{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
+              </div>
+              {selectedPresentation.waterfallSections.map((section) => (
+                <div className="planner-waterfall-section" key={section.id}>
+                  <h3>{section.title}</h3>
+                  {section.rows.map((row) => (
+                    <div className={`planner-waterfall-row${row.id.endsWith("total") || row.id === "net-profit" ? " is-total" : ""}${row.isNegative ? " is-negative" : ""}`} key={row.id}>
+                      <span className="planner-waterfall-label">{row.label}</span>
+                      <strong className="planner-waterfall-amount">{formatCurrency(row.amount, currencyCode)}</strong>
+                      <span className="planner-waterfall-percent">{formatPercent(row.percentOfReferencePrice)}</span>
+                      {row.barWidthPercent !== null && <div className="planner-waterfall-track" aria-hidden="true"><span className="planner-waterfall-fill" style={{ width: `${row.barWidthPercent}%` }} /></div>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </section>
           </div>
+
+          <section className="panel planner-viability" data-pack={selectedPack} aria-labelledby="planner-viability-heading">
+            <div className="planner-viability-copy">
+              <div className="planner-section-caption"><span>05</span> REFERENCE-PRICE VIABILITY</div>
+              <h2 id="planner-viability-heading">{formatPercent(selectedResult.netMargin)} <span>net margin</span></h2>
+              <p>Reference sale price · {formatCurrency(inputsForPack(engineInputs, selectedPack).referenceSellingPrice, currencyCode)}</p>
+            </div>
+            <div className="planner-viability-aside">
+              <span>Net profit</span>
+              <strong>{formatCurrency(selectedResult.netProfit, currencyCode)}</strong>
+              <small>ROI {formatPercent(selectedResult.roi)}</small>
+            </div>
+            {selectedPresentation.viabilityScale && (
+              <div className="planner-viability-chart">
+                <div className="planner-viability-track" role="img" aria-label={`Target margin marker at ${formatPercent(selectedPresentation.viabilityScale.targetMargin)}`}>
+                  {selectedPresentation.viabilityScale.targetPositionPercent !== null && <span className="planner-viability-marker is-target" style={{ left: `${selectedPresentation.viabilityScale.targetPositionPercent}%` }} />}
+                </div>
+                <div className="planner-viability-axis-labels">
+                  {selectedPresentation.viabilityScale.targetPositionPercent !== null && <span style={{ left: `${selectedPresentation.viabilityScale.targetPositionPercent}%` }}>Target {formatPercent(selectedPresentation.viabilityScale.targetMargin)}</span>}
+                </div>
+              </div>
+            )}
+            <div className="planner-viability-warnings">
+              {selectedPackTotal.pendingExtraCount > 0 && <div className="planner-assumption-warning"><AlertCircle size={14} />{selectedPackTotal.pendingExtraCount} extras pending a price</div>}
+              <div className="planner-assumption-warning"><AlertCircle size={14} />Reference price is an assumption</div>
+            </div>
+          </section>
+
+          <section className="planner-comparison" aria-labelledby="planner-comparison-heading">
+            <div className="planner-section-title"><div><div className="planner-section-caption"><span>06</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
+            <div className="planner-comparison-grid">
+              {plannerPacks.map((pack) => (
+                <article className={`panel planner-comparison-card${pack.id === selectedPack ? " is-selected" : ""}`} data-pack={pack.id} key={pack.id}>
+                  <div className="planner-comparison-heading"><div><div className="eyebrow">CONSTRUCTION COST</div><h3>{pack.label}</h3></div><strong>{formatCurrency(pack.packTotal.total, currencyCode)}</strong></div>
+                  <div className="planner-comparison-values">
+                    <div><span>Sale price used</span><strong>{formatCurrency(inputsForPack(engineInputs, pack.id).referenceSellingPrice, currencyCode)}</strong></div>
+                    <div><span>Development cost</span><strong>{formatCurrency(pack.result.developmentCost, currencyCode)}</strong></div>
+                    <div><span>Required sale price</span><strong>{pack.result.requiredSalePriceError ? "—" : formatCurrency(pack.result.requiredSalePrice, currencyCode)}</strong></div>
+                    <div><span>Net profit</span><strong>{formatCurrency(pack.result.netProfit, currencyCode)}</strong></div>
+                    <div><span>Net margin</span><strong>{formatPercent(pack.result.netMargin)}</strong></div>
+                    <div><span>ROI</span><strong>{formatPercent(pack.result.roi)}</strong></div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      <section className="panel planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
+        <div className="planner-sale-prices-header">
+          <div><div className="planner-section-caption"><span>07</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
           <span className="pill attention"><i />ASSUMPTION</span>
         </div>
         <form onSubmit={saveSalePrices}>
           <div className="planner-sale-price-table-wrap">
             <table className="planner-sale-price-table">
-              <thead>
-                <tr>
-                  <th scope="col">House type</th>
-                  {packDefinitions.map(({ id, label }) => (
-                    <th scope="col" key={id}>{label}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><tr><th scope="col">House type</th>{packDefinitions.map(({ id, label }) => <th scope="col" key={id}>{label}</th>)}</tr></thead>
               <tbody>
                 {salePriceMatrixRows.map(({ houseType, saved, salePrices, metrics }) => (
                   <tr key={houseType.id}>
-                    <th scope="row">{houseType.name}</th>
+                    <th scope="row"><span>{houseType.name}</span>{houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL</small>}</th>
                     {packDefinitions.map(({ id, label }) => {
                       const cell = salePrices[id];
                       const dirty = salePriceCellIsDirty(cell, saved, id);
                       return (
                         <td key={id}>
                           <div className="planner-sale-price-cell">
-                            <label className="planner-sale-price-input-label">
-                              <span className="sr-only">
-                                {houseType.name} {label} sale price
-                              </span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={cell.price}
-                                onChange={(event) =>
-                                  updateSalePriceDraftCell(
-                                    houseType.id,
-                                    id,
-                                    "price",
-                                    event.target.value,
-                                  )
-                                }
-                              />
-                            </label>
-                            <label className="planner-sale-price-note-label">
-                              <span className="sr-only">
-                                {houseType.name} {label} price source note
-                              </span>
-                              <input
-                                type="text"
-                                placeholder="Estimate, comparable sale, offer received"
-                                value={cell.note}
-                                onChange={(event) =>
-                                  updateSalePriceDraftCell(
-                                    houseType.id,
-                                    id,
-                                    "note",
-                                    event.target.value,
-                                  )
-                                }
-                              />
-                            </label>
-                            {dirty && <span className="planner-sale-price-unsaved">unsaved</span>}
+                            <label className="planner-sale-price-input-label"><span className="sr-only">{houseType.name} {label} sale price</span><span className="planner-sale-currency">{currencyCode === "EUR" ? "€" : currencyCode === "GBP" ? "£" : "$"}</span><input type="number" min="0" step="0.01" value={cell.price} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "price", event.target.value)} /></label>
+                            <label className="planner-sale-price-note-label"><span className="sr-only">{houseType.name} {label} price source note</span><input type="text" placeholder="Estimate, comparable sale, offer received" value={cell.note} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "note", event.target.value)} /></label>
+                            {dirty && <span className="planner-sale-price-unsaved">Unsaved</span>}
                             <div className="planner-sale-price-metrics">
-                              <span>
-                                ROI
-                                <strong>{formatPercent(metrics[id].roi)}</strong>
-                                {houseType.costBasis === "Twin CSV (provisional)" && (
-                                  <span className="pill attention planner-provisional-roi">
-                                    <i />PROVISIONAL
-                                  </span>
-                                )}
-                              </span>
-                              <span>
-                                Sale price / m²
-                                <strong>
-                                  {formatCurrency(
-                                    metrics[id].salePricePerSquareMeter,
-                                    currencyCode,
-                                  )}
-                                </strong>
-                              </span>
+                              <span>ROI<strong>{formatPercent(metrics[id].roi)}</strong>{houseType.costBasis === "Twin CSV (provisional)" && <span className="pill attention planner-provisional-roi"><i />PROVISIONAL</span>}</span>
+                              <span>Sale price / m²<strong>{formatCurrency(metrics[id].salePricePerSquareMeter, currencyCode)}</strong></span>
                             </div>
                           </div>
                         </td>
@@ -752,552 +956,32 @@ export default function PlannerPage({
               </tbody>
             </table>
           </div>
-          {salePriceNotice && (
-            <div className="inline-message" role="status">
-              <Check size={15} />
-              {salePriceNotice}
-            </div>
-          )}
-          {salePriceSaveError && (
-            <div className="inline-message" role="alert">
-              <AlertCircle size={15} />
-              {salePriceSaveError}
-            </div>
-          )}
-          <div className="form-actions planner-sale-price-actions">
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={
-                updateSalePrices.isPending || dirtySalePriceRows.length === 0
-              }
-            >
-              <Save size={14} />
-              {updateSalePrices.isPending ? "Saving…" : "Save sale prices"}
-            </button>
-          </div>
+          {salePriceNotice && <div className="inline-message" role="status"><Check size={15} />{salePriceNotice}</div>}
+          {salePriceSaveError && <div className="inline-message" role="alert"><AlertCircle size={15} />{salePriceSaveError}</div>}
+          <div className="form-actions planner-sale-price-actions"><button className="button button-primary" type="submit" disabled={updateSalePrices.isPending || dirtySalePriceRows.length === 0}><Save size={14} />{updateSalePrices.isPending ? "Saving…" : "Save sale prices"}</button></div>
         </form>
       </section>
 
-      <div
-        className="planner-house-type-tabs"
-        role="tablist"
-        aria-label="Choose a house type"
-      >
-        {houseTypesQuery.data?.map((houseType, index) => (
-          <button
-            aria-controls="planner-house-type-panel"
-            aria-selected={selectedHouseTypeId === houseType.id}
-            className="planner-house-type-tab"
-            id={`planner-house-type-tab-${houseType.id}`}
-            key={houseType.id}
-            onClick={() => setSelectedHouseTypeId(houseType.id)}
-            onKeyDown={(event) => {
-              const nextIndex =
-                event.key === "ArrowRight"
-                  ? (index + 1) % houseTypesQuery.data!.length
-                  : event.key === "ArrowLeft"
-                    ? (index - 1 + houseTypesQuery.data!.length) %
-                      houseTypesQuery.data!.length
-                    : null;
-              if (nextIndex !== null) {
-                event.preventDefault();
-                const nextHouseType = houseTypesQuery.data![nextIndex];
-                setSelectedHouseTypeId(nextHouseType.id);
-                document
-                  .getElementById(`planner-house-type-tab-${nextHouseType.id}`)
-                  ?.focus();
-              }
-            }}
-            role="tab"
-            tabIndex={selectedHouseTypeId === houseType.id ? 0 : -1}
-            type="button"
-          >
-            {houseType.name}
-          </button>
-        ))}
-      </div>
-
-      {selectedHouseType?.costBasis === "Twin CSV (provisional)" && (
-        <div className="planner-provisional-banner" role="note">
-          Costs for this type use the Twin CSV (provisional). Import a
-          type-specific CSV to change this.
+      <section className="panel planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
+        <div className="planner-section-title"><div><div className="planner-section-caption"><span>08</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
+        <div className="planner-house-type-table-wrap">
+          <table className="planner-house-type-table">
+            <thead><tr><th scope="col">House type</th><th scope="col">Land</th><th scope="col">Standard</th><th scope="col">Eco</th><th scope="col">Premium</th></tr></thead>
+            <tbody>
+              {comparisonRows.map((row) => (
+                <tr className={row.id === selectedHouseTypeId ? "is-selected" : ""} key={row.id}>
+                  <th scope="row"><div className="planner-house-type-name"><span>{row.name}</span>{row.costBasis === "Twin CSV (provisional)" && <span className="pill attention"><i />PROVISIONAL</span>}</div></th>
+                  <td>{formatCurrency(row.land, currencyCode)}</td>
+                  {packDefinitions.map(({ id }) => {
+                    const metrics = row[id];
+                    return <td key={id}><div className="planner-house-type-pack-metrics"><span><em>Net profit</em><strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong></span><span><em>Net margin</em><strong>{formatPercent(metrics.netMargin)}</strong></span><span><em>ROI</em><strong>{formatPercent(metrics.roi)}</strong></span></div></td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
-        {packDefinitions.map(({ id, label }) => (
-          <button
-            aria-controls="planner-panel"
-            aria-selected={selectedPack === id}
-            className="planner-pack-tab"
-            data-pack={id}
-            id={`planner-pack-tab-${id}`}
-            key={id}
-            onClick={() => setSelectedPack(id)}
-            onKeyDown={(event) => {
-              const currentIndex = packDefinitions.findIndex(
-                (pack) => pack.id === id,
-              );
-              const nextIndex =
-                event.key === "ArrowRight"
-                  ? (currentIndex + 1) % packDefinitions.length
-                  : event.key === "ArrowLeft"
-                    ? (currentIndex - 1 + packDefinitions.length) %
-                      packDefinitions.length
-                    : null;
-              if (nextIndex !== null) {
-                event.preventDefault();
-                const nextPack = packDefinitions[nextIndex];
-                setSelectedPack(nextPack.id);
-                document
-                  .getElementById(`planner-pack-tab-${nextPack.id}`)
-                  ?.focus();
-              }
-            }}
-            role="tab"
-            tabIndex={selectedPack === id ? 0 : -1}
-            type="button"
-          >
-            <span className="planner-pack-swatch" aria-hidden="true" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <section
-        className="panel register-panel"
-        id="planner-house-type-panel"
-        aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}
-      >
-        <div className="register-toolbar">
-          <div>
-            <div className="eyebrow">ASSUMPTIONS</div>
-            <strong>{selectedHouseType?.name ?? "House type"} · one house unit</strong>
-          </div>
-          <span className="pill attention"><i />ASSUMPTION</span>
-        </div>
-        <form className="form-grid recent-panel" onSubmit={save}>
-          {fieldDefinitions.map(({ key, label, step }) =>
-            key === "land" ? (
-              <div className="planner-land-inputs" key={key}>
-                <label className="form-field">
-                  <span>Land · ASSUMPTION</span>
-                  <input
-                    type="number"
-                    step={step}
-                    value={draft.land}
-                    onChange={(event) => {
-                      setDraft((current) => ({
-                        ...current,
-                        land: event.target.value,
-                      }));
-                      setNotice("");
-                      setSaveError("");
-                    }}
-                  />
-                </label>
-                <label className="form-field">
-                  <span>Land note</span>
-                  <input
-                    type="text"
-                    value={landNote}
-                    onChange={(event) => {
-                      setLandNote(event.target.value);
-                      setNotice("");
-                      setSaveError("");
-                    }}
-                  />
-                </label>
-              </div>
-            ) : (
-              <label className="form-field" key={key}>
-                <span>{label} · ASSUMPTION</span>
-                <input
-                  type="number"
-                  step={step}
-                  value={draft[key]}
-                  onChange={(event) => {
-                    setDraft((current) => ({
-                      ...current,
-                      [key]: event.target.value,
-                    }));
-                    setNotice("");
-                    setSaveError("");
-                  }}
-                />
-              </label>
-            ),
-          )}
-          <div className="form-actions">
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={updateInputs.isPending}
-            >
-              <Save size={14} />
-              {updateInputs.isPending ? "Saving…" : "Save assumptions"}
-            </button>
-          </div>
-        </form>
       </section>
-
-      {notice && (
-        <div className="inline-message" role="status">
-          <Check size={15} />
-          {notice}
-        </div>
-      )}
-      {saveError && (
-        <div className="inline-message" role="alert">
-          <AlertCircle size={15} />
-          {saveError}
-        </div>
-      )}
-      {hasRequiredPriceError && (
-        <div className="inline-message" role="alert">
-          <AlertCircle size={15} />
-          Target NET margin, sales commission and taxes must total less than 100%
-          to calculate the required sale price.
-        </div>
-      )}
-
-      {selectedResult && selectedPresentation && selectedPackTotal && (
-        <div
-          aria-labelledby={`planner-pack-tab-${selectedPack}`}
-          className="planner-panel"
-          id="planner-panel"
-          role="tabpanel"
-        >
-          <section
-            aria-label={`${packDefinitions.find((pack) => pack.id === selectedPack)?.label} pack key figures`}
-            className="planner-kpi-grid"
-            data-pack={selectedPack}
-          >
-            <article className="metric-tile planner-kpi" data-pack={selectedPack}>
-              <div className="metric-top">
-                <span className="source-col">DEVELOPMENT COST / M²</span>
-                <span className="pill neutral"><i />{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
-              </div>
-              <strong className="planner-kpi-value">
-                {formatCurrency(selectedResult.costPerSquareMeter, currencyCode)}
-              </strong>
-            </article>
-            <article className="metric-tile planner-kpi" data-pack={selectedPack}>
-              <div className="metric-top">
-                <span className="source-col">REQUIRED SALE PRICE / M²</span>
-                <span className="pill neutral"><i />{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
-              </div>
-              <strong className="planner-kpi-value">
-                {selectedResult.requiredSalePriceError
-                  ? "Error"
-                  : formatCurrency(
-                      selectedPresentation.requiredSalePricePerSquareMeter,
-                      currencyCode,
-                    )}
-              </strong>
-            </article>
-            <article className="metric-tile planner-kpi" data-pack={selectedPack}>
-              <div className="metric-top">
-                <span className="source-col">NET PROFIT AT REFERENCE PRICE</span>
-                <span className="pill neutral"><i />{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
-              </div>
-              <strong className="planner-kpi-value">
-                {formatCurrency(selectedResult.netProfit, currencyCode)}
-              </strong>
-            </article>
-            <article className="metric-tile planner-kpi" data-pack={selectedPack}>
-              <div className="metric-top">
-                <span className="source-col">ROI</span>
-                <span className="pill neutral"><i />{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
-              </div>
-              <strong className="planner-kpi-value">
-                {formatPercent(selectedResult.roi)}
-              </strong>
-            </article>
-          </section>
-
-          <div className="planner-outcome-grid">
-            <section
-              className="panel planner-waterfall"
-              data-pack={selectedPack}
-              aria-labelledby="planner-waterfall-heading"
-            >
-              <div className="planner-card-heading">
-                <div>
-                  <div className="eyebrow">COST WATERFALL</div>
-                  <h2 id="planner-waterfall-heading">One house unit</h2>
-                </div>
-                <span className="planner-pack-badge" data-pack={selectedPack}>
-                  {packDefinitions.find((pack) => pack.id === selectedPack)?.label}
-                </span>
-              </div>
-              {selectedPresentation.waterfallSections.map((section) => (
-                <div className="planner-waterfall-section" key={section.id}>
-                  <h3>{section.title}</h3>
-                  {section.rows.map((row) => (
-                    <div
-                      className={`planner-waterfall-row${row.id.endsWith("total") || row.id === "net-profit" ? " is-total" : ""}${row.isNegative ? " is-negative" : ""}`}
-                      key={row.id}
-                    >
-                      <span className="planner-waterfall-label">{row.label}</span>
-                      <strong className="planner-waterfall-amount">
-                        {formatCurrency(row.amount, currencyCode)}
-                      </strong>
-                      <span className="planner-waterfall-percent">
-                        {formatPercent(row.percentOfReferencePrice)}
-                      </span>
-                      {row.barWidthPercent !== null && (
-                        <div className="planner-waterfall-track" aria-hidden="true">
-                          <span
-                            className="planner-waterfall-fill"
-                            style={{ width: `${row.barWidthPercent}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </section>
-
-            <section
-              className="panel planner-viability"
-              data-pack={selectedPack}
-              aria-labelledby="planner-viability-heading"
-            >
-              <div className="planner-card-heading">
-                <div>
-                  <div className="eyebrow">VIABILITY</div>
-                  <h2 id="planner-viability-heading">At reference price</h2>
-                </div>
-                {selectedResult.viable !== null && (
-                  <span className={`pill ${selectedResult.viable ? "good" : "bad"}`}>
-                    <i />
-                    {selectedResult.viable ? "Viable" : "Not viable"}
-                  </span>
-                )}
-              </div>
-              <span className="planner-viability-label">Net margin</span>
-              <strong className="planner-viability-margin">
-                {formatPercent(selectedResult.netMargin)}
-              </strong>
-              <div className="planner-viability-stats">
-                <div>
-                  <span>ROI</span>
-                  <strong>{formatPercent(selectedResult.roi)}</strong>
-                </div>
-                <div>
-                  <span>Net profit</span>
-                  <strong>{formatCurrency(selectedResult.netProfit, currencyCode)}</strong>
-                </div>
-              </div>
-              {selectedPresentation.viabilityScale && (
-                <div className="planner-viability-chart">
-                  <div
-                    className="planner-viability-track"
-                    role="img"
-                    aria-label={`Net margin ${formatPercent(selectedResult.netMargin)}; zero marker and target margin marker`}
-                  >
-                    {selectedPresentation.viabilityScale.fillStartPercent !== null &&
-                      selectedPresentation.viabilityScale.fillWidthPercent !== null && (
-                        <span
-                          className={`planner-viability-fill${selectedPresentation.viabilityScale.currentIsPositive ? " is-positive" : " is-negative"}`}
-                          style={{
-                            left: `${selectedPresentation.viabilityScale.fillStartPercent}%`,
-                            width: `${selectedPresentation.viabilityScale.fillWidthPercent}%`,
-                          }}
-                        />
-                      )}
-                    <span
-                      className="planner-viability-marker is-zero"
-                      style={{
-                        left: `${selectedPresentation.viabilityScale.zeroPositionPercent}%`,
-                      }}
-                    />
-                    {selectedPresentation.viabilityScale.targetPositionPercent !== null && (
-                      <span
-                        className="planner-viability-marker is-target"
-                        style={{
-                          left: `${selectedPresentation.viabilityScale.targetPositionPercent}%`,
-                        }}
-                      />
-                    )}
-                    {selectedPresentation.viabilityScale.currentPositionPercent !== null && (
-                      <span
-                        className="planner-viability-marker is-current"
-                        style={{
-                          left: `${selectedPresentation.viabilityScale.currentPositionPercent}%`,
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="planner-viability-axis-labels">
-                    <span
-                      style={{
-                        left: `${selectedPresentation.viabilityScale.zeroPositionPercent}%`,
-                      }}
-                    >
-                      0%
-                    </span>
-                    {selectedPresentation.viabilityScale.targetPositionPercent !== null && (
-                      <span
-                        style={{
-                          left: `${selectedPresentation.viabilityScale.targetPositionPercent}%`,
-                        }}
-                      >
-                        Target {formatPercent(selectedPresentation.viabilityScale.targetMargin)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              <div className="planner-viability-warnings">
-                {selectedPackTotal.pendingExtraCount > 0 && (
-                  <div className="planner-assumption-warning">
-                    <AlertCircle size={14} />
-                    {selectedPackTotal.pendingExtraCount} extras pending a price
-                  </div>
-                )}
-                <div className="planner-assumption-warning">
-                  <AlertCircle size={14} />
-                  Reference price is an assumption
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <section className="planner-comparison" aria-labelledby="planner-comparison-heading">
-            <div className="section-heading">
-              <div>
-                <div className="eyebrow">PACK COMPARISON</div>
-                <h2 id="planner-comparison-heading">Same assumptions · one house unit</h2>
-              </div>
-            </div>
-            <div className="planner-comparison-grid">
-              {plannerPacks.map((pack) => (
-                <article
-                  className={`panel planner-comparison-card${pack.id === selectedPack ? " is-selected" : ""}`}
-                  data-pack={pack.id}
-                  key={pack.id}
-                >
-                  <div className="planner-comparison-heading">
-                    <div>
-                      <div className="eyebrow">CONSTRUCTION COST</div>
-                      <h3>{pack.label}</h3>
-                    </div>
-                    <strong>{formatCurrency(pack.packTotal.total, currencyCode)}</strong>
-                  </div>
-                  <div className="planner-comparison-values">
-                    <div>
-                      <span>Sale price used</span>
-                      <strong>
-                        {formatCurrency(
-                          inputsForPack(engineInputs, pack.id).referenceSellingPrice,
-                          currencyCode,
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Development cost</span>
-                      <strong>{formatCurrency(pack.result.developmentCost, currencyCode)}</strong>
-                    </div>
-                    <div>
-                      <span>Required sale price</span>
-                      <strong>
-                        {pack.result.requiredSalePriceError
-                          ? "Error"
-                          : formatCurrency(pack.result.requiredSalePrice, currencyCode)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Net profit</span>
-                      <strong>{formatCurrency(pack.result.netProfit, currencyCode)}</strong>
-                    </div>
-                    <div>
-                      <span>Net margin</span>
-                      <strong>{formatPercent(pack.result.netMargin)}</strong>
-                    </div>
-                    <div>
-                      <span>ROI</span>
-                      <strong>{formatPercent(pack.result.roi)}</strong>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section
-            className="panel planner-house-type-comparison"
-            aria-labelledby="planner-house-type-comparison-heading"
-          >
-            <div className="section-heading">
-              <div>
-                <div className="eyebrow">HOUSE TYPE COMPARISON</div>
-                <h2 id="planner-house-type-comparison-heading">Compare house types</h2>
-              </div>
-            </div>
-            <div className="planner-house-type-table-wrap">
-              <table className="planner-house-type-table">
-                <thead>
-                  <tr>
-                    <th scope="col">House type</th>
-                    <th scope="col">Land</th>
-                    <th scope="col">Standard</th>
-                    <th scope="col">Eco</th>
-                    <th scope="col">Premium</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonRows.map((row) => (
-                    <tr
-                      className={
-                        row.id === selectedHouseTypeId ? "is-selected" : ""
-                      }
-                      key={row.id}
-                    >
-                      <th scope="row">
-                        <div className="planner-house-type-name">
-                          <span>{row.name}</span>
-                          {row.costBasis === "Twin CSV (provisional)" && (
-                            <span className="pill attention">
-                              <i />
-                              PROVISIONAL
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                      <td>{formatCurrency(row.land, currencyCode)}</td>
-                      {packDefinitions.map(({ id }) => {
-                        const metrics = row[id];
-                        return (
-                          <td key={id}>
-                            <div className="planner-house-type-pack-metrics">
-                              <span>
-                                <em>Net profit</em>
-                                <strong>{formatCurrency(metrics.netProfit, currencyCode)}</strong>
-                              </span>
-                              <span>
-                                <em>Net margin</em>
-                                <strong>{formatPercent(metrics.netMargin)}</strong>
-                              </span>
-                              <span>
-                                <em>ROI</em>
-                                <strong>{formatPercent(metrics.roi)}</strong>
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

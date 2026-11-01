@@ -44,6 +44,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - Keep exactly these pages: Overview, Materials map, Quotes & documents, Sources.
 - Add a Planner section only when a prompt asks for it.
 - Locked design: dark green sidebar, cream background, current fonts, and card layout. Do not restyle without the user's request.
+- The Planner page uses the villa planner design. Sidebar and other pages keep the FieldNotes design.
 - Build only what the current prompt asks for. Ask when requirements are unclear or missing.
 - Before a major change, explain the plan and wait for approval.
 - After each task, list changed files, confirm what was tested, and stop for the user's next instruction.
