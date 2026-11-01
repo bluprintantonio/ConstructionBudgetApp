@@ -28,6 +28,18 @@ export const BudgetSourceSourceType = {
   plan: 'plan',
 } as const;
 
+/**
+ * @nullable
+ */
+export type BudgetSourceSnapshotDriftStatus = typeof BudgetSourceSnapshotDriftStatus[keyof typeof BudgetSourceSnapshotDriftStatus] | null;
+
+
+export const BudgetSourceSnapshotDriftStatus = {
+  never_checked: 'never checked',
+  in_sync: 'in sync',
+  changed_in_Drive: 'changed in Drive',
+} as const;
+
 export interface BudgetSourceChild {
   name: string;
   type: string;
@@ -41,6 +53,12 @@ export interface BudgetSource {
   sourceType: BudgetSourceSourceType;
   url: string;
   note: string;
+  /** @nullable */
+  snapshotVerifiedOn: string | null;
+  /** @nullable */
+  snapshotDriveModifiedTime: string | null;
+  /** @nullable */
+  snapshotDriftStatus: BudgetSourceSnapshotDriftStatus;
   /** @nullable */
   driveModifiedTime: string | null;
   /** @nullable */
@@ -188,12 +206,18 @@ export interface CapChapter {
   kind: CapChapterKind;
   /** @nullable */
   specReference: string | null;
+  /** @nullable */
+  decidedOn: string | null;
+  /** @nullable */
+  decisionReason: string | null;
 }
 
 export interface LineChapterOverride {
   budgetLineCode: string;
   chapterCode: string;
   reason: string;
+  /** @nullable */
+  decidedOn: string | null;
   createdAt: string;
 }
 
@@ -202,6 +226,7 @@ export interface LineChapterOverrideInput {
   chapterCode: string;
   /** @minLength 1 */
   reason: string;
+  decidedOn: string;
 }
 
 export type BudgetLineStatus = typeof BudgetLineStatus[keyof typeof BudgetLineStatus];
@@ -291,6 +316,10 @@ export interface BudgetLine {
   /** @nullable */
   priceBasis: string | null;
   marker: BudgetLineMarker;
+  /** @nullable */
+  markerDecisionReason: string | null;
+  /** @nullable */
+  markerDecidedOn: string | null;
   /** @nullable */
   sourceUrl: string | null;
   createdAt: string;
@@ -441,6 +470,10 @@ export const LineMarkerMarker = {
 export interface LineMarker {
   budgetLineCode: string;
   marker: LineMarkerMarker;
+  /** @nullable */
+  decisionReason: string | null;
+  /** @nullable */
+  decidedOn: string | null;
 }
 
 export type LineMarkerUpdateMarker = typeof LineMarkerUpdateMarker[keyof typeof LineMarkerUpdateMarker];
@@ -456,6 +489,9 @@ export const LineMarkerUpdateMarker = {
 
 export interface LineMarkerUpdate {
   marker: LineMarkerUpdateMarker;
+  /** @minLength 1 */
+  decisionReason: string;
+  decidedOn: string;
 }
 
 export type BudgetExtraPriceStatus = typeof BudgetExtraPriceStatus[keyof typeof BudgetExtraPriceStatus];
@@ -482,6 +518,10 @@ export interface BudgetExtra {
   quoteId: string | null;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  decisionReason: string | null;
+  /** @nullable */
+  decidedOn: string | null;
 }
 
 export type BudgetExtraUpdatePriceStatus = typeof BudgetExtraUpdatePriceStatus[keyof typeof BudgetExtraUpdatePriceStatus];

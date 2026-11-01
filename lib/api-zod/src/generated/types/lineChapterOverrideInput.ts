@@ -11,4 +11,5 @@ export interface LineChapterOverrideInput {
   chapterCode: string;
   /** @minLength 1 */
   reason: string;
+  decidedOn: Date;
 }

@@ -9,4 +9,7 @@ import type { LineMarkerUpdateMarker } from './lineMarkerUpdateMarker';
 
 export interface LineMarkerUpdate {
   marker: LineMarkerUpdateMarker;
+  /** @minLength 1 */
+  decisionReason: string;
+  decidedOn: Date;
 }

@@ -10,5 +10,7 @@ export interface LineChapterOverride {
   budgetLineCode: string;
   chapterCode: string;
   reason: string;
+  /** @nullable */
+  decidedOn: Date | null;
   createdAt: Date;
 }

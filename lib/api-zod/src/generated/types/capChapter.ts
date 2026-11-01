@@ -14,4 +14,8 @@ export interface CapChapter {
   kind: CapChapterKind;
   /** @nullable */
   specReference: string | null;
+  /** @nullable */
+  decidedOn: Date | null;
+  /** @nullable */
+  decisionReason: string | null;
 }

@@ -10,4 +10,8 @@ import type { LineMarkerMarker } from './lineMarkerMarker';
 export interface LineMarker {
   budgetLineCode: string;
   marker: LineMarkerMarker;
+  /** @nullable */
+  decisionReason: string | null;
+  /** @nullable */
+  decidedOn: Date | null;
 }

@@ -61,6 +61,10 @@ export const sourcesTable = pgTable("sources", {
   type: sourceTypeEnum("type").notNull(),
   driveFileId: text("drive_file_id").notNull(),
   driveUrl: text("drive_url").notNull(),
+  snapshotVerifiedOn: date("snapshot_verified_on", { mode: "string" }),
+  snapshotDriveModifiedTime: timestamp("snapshot_drive_modified_time", {
+    withTimezone: true,
+  }),
   driveModifiedTime: timestamp("drive_modified_time", { withTimezone: true }),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   status: text("status"),
@@ -107,6 +111,8 @@ export const budgetLinesTable = pgTable("budget_lines", {
 export const lineMarkersTable = pgTable("line_markers", {
   budgetLineCode: text("budget_line_code").notNull().unique(),
   marker: lineMarkerEnum("marker").notNull().default("common"),
+  decidedOn: date("decided_on", { mode: "string" }),
+  decisionReason: text("decision_reason"),
 });
 
 export const budgetQuotesTable = pgTable("budget_quotes", {
@@ -150,6 +156,8 @@ export const extrasTable = pgTable("extras", {
     onDelete: "set null",
   }),
   notes: text("notes"),
+  decidedOn: date("decided_on", { mode: "string" }),
+  decisionReason: text("decision_reason"),
 });
 
 export const quoteLinksTable = pgTable(

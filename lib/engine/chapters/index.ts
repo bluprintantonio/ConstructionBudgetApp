@@ -10,6 +10,8 @@ export type ChapterRecord = {
   sortOrder: number;
   kind: "original" | "added";
   specReference: string | null;
+  decidedOn?: string | null;
+  decisionReason?: string | null;
 };
 
 export type ChapterOverrideRecord = {
@@ -47,6 +49,9 @@ export type ChapterGroup = {
   name: string;
   sortOrder: number;
   kind: "original" | "added";
+  specReference: string | null;
+  decidedOn: string | null;
+  decisionReason: string | null;
   lines: ChapterBudgetLine[];
   totals: {
     standard: PackCost;
@@ -93,6 +98,8 @@ export function getEffectiveChapter(
     sortOrder: chapter?.sortOrder ?? Number.MAX_SAFE_INTEGER,
     kind: chapter?.kind ?? "original",
     specReference: chapter?.specReference ?? null,
+    decidedOn: chapter?.decidedOn ?? null,
+    decisionReason: chapter?.decisionReason ?? null,
     sourceChapterCode: sourceCode,
     isOverridden: Boolean(appliedOverride),
     overrideReason: appliedOverride?.reason ?? null,
@@ -151,6 +158,9 @@ export function calculateChapterGroups(
       name: chapter.name,
       sortOrder: chapter.sortOrder,
       kind: chapter.kind,
+      specReference: chapter.specReference ?? null,
+      decidedOn: chapter.decidedOn ?? null,
+      decisionReason: chapter.decisionReason ?? null,
       lines: chapterLines,
       totals: {
         standard: totals.standard,

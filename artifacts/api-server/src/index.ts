@@ -3,12 +3,11 @@ import { and, isNotNull, isNull, sql } from "drizzle-orm";
 import {
   budgetQuotesTable,
   db,
-  houseTypesTable,
   plannerInputsTable,
 } from "@workspace/db";
 import { logger } from "./lib/logger";
-import { plannerHouseTypeSeedRows } from "./lib/budget-seed";
 import { seedChapterData } from "./lib/chapter-seed";
+import { seedPlannerHouseTypes } from "./lib/budget-data-seed";
 
 const rawPort = process.env["PORT"];
 
@@ -27,10 +26,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function startServer(): Promise<void> {
   await seedChapterData();
 
-  await db
-    .insert(houseTypesTable)
-    .values([...plannerHouseTypeSeedRows])
-    .onConflictDoNothing({ target: houseTypesTable.id });
+  await seedPlannerHouseTypes();
 
   await db
     .update(plannerInputsTable)

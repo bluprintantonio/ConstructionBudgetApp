@@ -793,6 +793,9 @@ export default function PlannerPage({
   return (
     <div className="planner-page">
       {pageHeader}
+      <div className="data-footnote">
+        <strong>Model rule.</strong> Pack totals use the shared pack engine; Planner profit, margin, ROI, and €/m² use the Planner engine. These are documented calculation rules, not imported data.
+      </div>
       <div className="planner-content-stack">
        <div className="planner-choice-stack">
         <section className="planner-choice-section" aria-label="House types">

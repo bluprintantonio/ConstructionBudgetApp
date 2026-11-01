@@ -36,18 +36,50 @@ const approvedLineMarkers: Record<LineMarkerValue, readonly string[]> = {
 export const initialLineMarkerAssignments: Array<{
   budgetLineCode: string;
   marker: LineMarkerValue;
+  decidedOn: string;
+  decisionReason: string;
 }> = [
-  { budgetLineCode: "10.3", marker: "not_applicable" },
-  { budgetLineCode: "12.3", marker: "not_applicable" },
-  { budgetLineCode: "14.2", marker: "systems" },
-  { budgetLineCode: "14.5", marker: "systems" },
+  {
+    budgetLineCode: "10.3",
+    marker: "not_applicable",
+    decidedOn: "2026-11-01",
+    decisionReason: "Not applicable in Premium",
+  },
+  {
+    budgetLineCode: "12.3",
+    marker: "not_applicable",
+    decidedOn: "2026-11-01",
+    decisionReason: "Not applicable in Premium",
+  },
+  {
+    budgetLineCode: "14.2",
+    marker: "systems",
+    decidedOn: "2026-11-01",
+    decisionReason: "Premium-rated: Premium price applies",
+  },
+  {
+    budgetLineCode: "14.5",
+    marker: "systems",
+    decidedOn: "2026-11-01",
+    decisionReason: "Premium-rated: Premium price applies",
+  },
 ];
+
+const lineMarkerReasons: Record<LineMarkerValue, string> = {
+  common: "Same in all packs: structure, earthworks, networks and common works",
+  finishings: "Premium-rated: Premium price applies",
+  equipment: "Premium-rated: Premium price applies",
+  systems: "Premium-rated: Premium price applies",
+  not_applicable: "Not applicable in Premium",
+};
 
 export const lineMarkerSeedRows = Object.entries(approvedLineMarkers).flatMap(
   ([marker, codes]) =>
     codes.map((budgetLineCode) => ({
       budgetLineCode,
       marker: marker as LineMarkerValue,
+      decidedOn: "2026-11-01",
+      decisionReason: lineMarkerReasons[marker as LineMarkerValue],
     })),
 );
 
@@ -64,6 +96,8 @@ export const seedExtras = [
     priceStatus: "pending",
     quoteId: null,
     notes: null,
+    decidedOn: "2026-10-31",
+    decisionReason: "Added at the user's request; fixed one-house-unit item.",
   },
   {
     id: "heat-pump",
@@ -77,6 +111,8 @@ export const seedExtras = [
     priceStatus: "pending",
     quoteId: null,
     notes: null,
+    decidedOn: "2026-10-31",
+    decisionReason: "Added at the user's request; fixed one-house-unit item.",
   },
   {
     id: "ev-charging",
@@ -90,6 +126,8 @@ export const seedExtras = [
     priceStatus: "pending",
     quoteId: null,
     notes: null,
+    decidedOn: "2026-10-31",
+    decisionReason: "Added at the user's request; fixed one-house-unit item.",
   },
   {
     id: "pergola",
@@ -103,6 +141,8 @@ export const seedExtras = [
     priceStatus: "pending",
     quoteId: null,
     notes: null,
+    decidedOn: "2026-10-31",
+    decisionReason: "Added at the user's request; fixed one-house-unit item.",
   },
   {
     id: "home-automation",
@@ -116,6 +156,8 @@ export const seedExtras = [
     priceStatus: "pending",
     quoteId: null,
     notes: null,
+    decidedOn: "2026-10-31",
+    decisionReason: "Added at the user's request; fixed one-house-unit item.",
   },
 ] satisfies BudgetExtra[];
 
@@ -179,6 +221,11 @@ export const sourceSeedRows = sources.map((source) => {
     type: source.sourceType === "spreadsheet" ? ("csv" as const) : ("folder" as const),
     driveFileId,
     driveUrl: source.url,
+    snapshotVerifiedOn: source.id === "materials-master" ? "2026-10-31" : null,
+    snapshotDriveModifiedTime:
+      source.id === "materials-master"
+        ? new Date("2026-10-31T10:49:23.220Z")
+        : null,
     driveModifiedTime: null,
     lastCheckedAt: null,
     status: null,

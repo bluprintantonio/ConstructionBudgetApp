@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BudgetSourceChild } from './budgetSourceChild';
+import type { BudgetSourceSnapshotDriftStatus } from './budgetSourceSnapshotDriftStatus';
 import type { BudgetSourceSourceType } from './budgetSourceSourceType';
 
 export interface BudgetSource {
@@ -14,6 +15,12 @@ export interface BudgetSource {
   sourceType: BudgetSourceSourceType;
   url: string;
   note: string;
+  /** @nullable */
+  snapshotVerifiedOn: Date | null;
+  /** @nullable */
+  snapshotDriveModifiedTime: Date | null;
+  /** @nullable */
+  snapshotDriftStatus: BudgetSourceSnapshotDriftStatus;
   /** @nullable */
   driveModifiedTime: string | null;
   /** @nullable */

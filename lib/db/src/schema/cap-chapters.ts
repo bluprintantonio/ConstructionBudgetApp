@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { date, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const capChapterKindEnum = pgEnum("cap_chapter_kind", [
@@ -13,6 +13,8 @@ export const capChaptersTable = pgTable("cap_chapters", {
   sortOrder: integer("sort_order").notNull(),
   kind: capChapterKindEnum("kind").notNull(),
   specReference: text("spec_reference"),
+  decidedOn: date("decided_on", { mode: "string" }),
+  decisionReason: text("decision_reason"),
 });
 
 export const lineChapterOverridesTable = pgTable("line_chapter_overrides", {
@@ -21,6 +23,7 @@ export const lineChapterOverridesTable = pgTable("line_chapter_overrides", {
     .notNull()
     .references(() => capChaptersTable.code, { onDelete: "restrict" }),
   reason: text("reason").notNull(),
+  decidedOn: date("decided_on", { mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

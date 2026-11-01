@@ -416,6 +416,13 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
     line: BudgetLine;
     chapterCode: string;
     reason: string;
+    decidedOn: string;
+  } | null>(null);
+  const [markerDecisionDraft, setMarkerDecisionDraft] = useState<{
+    line: BudgetLine;
+    marker: BudgetLine['marker'];
+    decisionReason: string;
+    decidedOn: string;
   } | null>(null);
   const [selectedPack, setSelectedPack] = useState<PackId>(readPackFromUrl);
    const [openBoard, setOpenBoard] = useState<MaterialsBoardId | null>(readBoardFromUrl);
@@ -522,15 +529,38 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
   };
   const saveMarker = (line: BudgetLine, marker: BudgetLine['marker']) => {
     if (!line.code) return;
+    setMarkerDecisionDraft({
+      line,
+      marker,
+      decisionReason: '',
+      decidedOn: localDateString(),
+    });
+  };
+  const saveMarkerDecision = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!markerDecisionDraft?.line.code) return;
+    const decisionReason = markerDecisionDraft.decisionReason.trim();
+    if (!decisionReason) {
+      setMessage('A reason is required for a marker decision.');
+      return;
+    }
     updateMarker.mutate(
-      { budgetLineCode: line.code, data: { marker } },
+      {
+        budgetLineCode: markerDecisionDraft.line.code,
+        data: {
+          marker: markerDecisionDraft.marker,
+          decisionReason,
+          decidedOn: markerDecisionDraft.decidedOn,
+        },
+      },
       {
         onSuccess: () => {
-          setMessage(`${line.code} marker saved. The Premium total is updated.`);
+          setMessage(`${markerDecisionDraft.line.code} marker saved. The Premium total is updated.`);
+          setMarkerDecisionDraft(null);
           void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() });
           void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() });
         },
-        onError: () => setMessage(`Could not save the marker for ${line.code}.`),
+        onError: () => setMessage(`Could not save the marker for ${markerDecisionDraft.line.code}.`),
       },
     );
   };
@@ -541,6 +571,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
       line,
       chapterCode: override?.chapterCode ?? effective?.code ?? '',
       reason: override?.reason ?? '',
+      decidedOn: override?.decidedOn ?? localDateString(),
     });
   };
   const saveChapterOverrideDraft = (event: FormEvent<HTMLFormElement>) => {
@@ -557,6 +588,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
         data: {
           chapterCode: chapterOverrideDraft.chapterCode,
           reason,
+          decidedOn: chapterOverrideDraft.decidedOn,
         },
       },
       {
@@ -643,11 +675,22 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
     const effectiveChapter = effectiveChapterByLineId.get(line.id);
     const chapterOverride = line.code ? chapterOverridesByCode.get(line.code) : undefined;
     return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
-      <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
-      <td className="marker-cell"><span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label></td>
+      <td>
+        <span className="material-code">{line.code || '—'}</span>
+        {line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}
+        {line.origin === 'imported' && <span className="pill neutral">Imported snapshot</span>}
+        {line.origin === 'imported' && <small className="source-ref">Matches Drive CSV · verified 2026-10-31</small>}
+        {line.origin === 'manual' && <span className="pill neutral">Decision</span>}
+        {line.origin === 'assumption' && <span className="pill attention">ASSUMPTION</span>}
+      </td>
+      <td className="marker-cell">
+        <span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span>
+        {line.markerDecisionReason && <small className="source-ref" title={line.markerDecisionReason}>Decision · {line.markerDecidedOn || '—'} · {line.markerDecisionReason}</small>}
+        <label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label>
+      </td>
       <td className="material-chapter">
         <span>{effectiveChapter ? `${effectiveChapter.code} ${effectiveChapter.name}` : line.category}</span>
-        {effectiveChapter?.isOverridden && chapterOverride && <small className="chapter-override-tag" title={chapterOverride.reason}>moved from {effectiveChapter.sourceChapterCode || 'source chapter'} · {chapterOverride.reason}</small>}
+        {effectiveChapter?.isOverridden && chapterOverride && <small className="chapter-override-tag" title={chapterOverride.reason}>moved from {effectiveChapter.sourceChapterCode || 'source chapter'} · {chapterOverride.reason} · Decision {chapterOverride.decidedOn || '—'}</small>}
         {effectiveChapter?.warning && <small className="pill attention" title={effectiveChapter.warning.message} data-testid={`warning-chapter-line-${line.code}`}>Override warning · CSV chapter used</small>}
         <button className="chapter-override-button" type="button" disabled={!line.code} onClick={() => openChapterEditor(line)}>{chapterOverride ? 'Change' : 'Move'}</button>
       </td>
@@ -744,7 +787,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
               <tbody>{extras.map(extra => {
                 const draft = draftForExtra(extra);
                 return <tr key={extra.id} data-testid={`row-extra-${extra.id}`}>
-                  <td><strong data-testid={`text-extra-name-${extra.id}`}>{extra.name}</strong></td>
+                  <td><strong data-testid={`text-extra-name-${extra.id}`}>{extra.name}</strong><small className="source-ref" title={extra.decisionReason || undefined}>Decision · {extra.decidedOn || '—'} · {extra.decisionReason || 'Reason not recorded'}</small></td>
                   <td><div className="row-actions">{extra.inEco && <span className="pill" data-testid={`flag-extra-eco-${extra.id}`}><i/>Eco</span>}{extra.inPremium && <span className="pill" data-testid={`flag-extra-premium-${extra.id}`}><i/>Premium</span>}</div></td>
                   <td><label className="form-field"><input aria-label={`${extra.name} quantity`} data-testid={`input-extra-quantity-${extra.id}`} type="number" min="0" step="1" value={draft.quantity} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { quantity: event.target.value })}/></label></td>
                   <td data-testid={`text-extra-unit-${extra.id}`}>{extra.unit}</td>
@@ -810,7 +853,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
           <div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter.code} key={chapter.code}>{chapter.code} {chapter.name}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div>
         </div>
         <div className="table-footer materials-count">
-          <span className="materials-count-primary">Showing {filtered.length} of {lines.length} materials<span className="materials-count-source"><span className="footer-dot"/>Master source retained</span></span>
+       <span className="materials-count-primary">Showing {filtered.length} of {lines.length} materials<span className="materials-count-source"><span className="footer-dot"/>Matches Drive CSV · verified 2026-10-31</span></span>
           <span className="materials-count-secondary"><span className="materials-count-note">{houseItemCount} materials · {chapters.length} chapters · Zero values and all three source tiers are preserved exactly.</span><button className="materials-marker-tip" type="button" title="Changing a marker changes the Premium total. Lines without a saved marker count as Common." aria-label="Marker note: Changing a marker changes the Premium total. Lines without a saved marker count as Common."><CircleHelp size={13}/></button></span>
         </div>
        <div className="chapter-list">
@@ -821,13 +864,13 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
               {empty
                 ? <div className="chapter-card-header chapter-card-header-empty">
                     <span className="chapter-chevron"><ChevronRight size={17}/></span>
-                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span>{group.kind === 'original' && <small className="source-ref">Imported snapshot</small>}{group.kind === 'added' && <small className="chapter-override-tag" title={group.decisionReason || ''}>Decision · {group.decidedOn || '—'} · {group.decisionReason || 'Added at the user’s request.'}</small>}{group.specReference && <small className="source-ref">Suggested, unverified · ASSUMPTION · {group.specReference}</small>}</span>
                     <span className="chapter-empty-label">no lines yet</span>
                     <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
                   </div>
                 : <button className="chapter-card-header" type="button" aria-expanded={!collapsed} onClick={() => toggleChapter(group.code)}>
                     <span className={`chapter-chevron${collapsed ? '' : ' is-open'}`}><ChevronRight size={17}/></span>
-                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span></span>
+                    <span className="chapter-title"><strong>{group.code}</strong><span>{group.name}</span>{group.kind === 'original' && <small className="source-ref">Imported snapshot</small>}{group.kind === 'added' && <small className="chapter-override-tag" title={group.decisionReason || ''}>Decision · {group.decidedOn || '—'} · {group.decisionReason || 'Added at the user’s request.'}</small>}{group.specReference && <small className="source-ref">Suggested, unverified · ASSUMPTION · {group.specReference}</small>}</span>
                     <span className="chapter-count">{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'}</span>
                     <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.totals[selectedPack].total, currencyCode)}</strong></span>
                   </button>}
@@ -874,6 +917,7 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
          <Field label="Reason (required)" wide>
            <textarea required rows={3} value={chapterOverrideDraft.reason} onChange={event => setChapterOverrideDraft(current => current ? { ...current, reason: event.target.value } : current)} placeholder="Why does this line belong in the selected chapter?"/>
          </Field>
+        <Field label="Decision date" wide><input type="date" required value={chapterOverrideDraft.decidedOn} onChange={event => setChapterOverrideDraft(current => current ? { ...current, decidedOn: event.target.value } : current)}/></Field>
          <div className="form-actions chapter-override-actions">
            {chapterOverridesByCode.has(chapterOverrideDraft.line.code || '') && <button className="button button-secondary" type="button" onClick={removeChapterOverrideForLine} disabled={removeChapterOverride.isPending || saveChapterOverride.isPending}>Remove override</button>}
            <button className="button button-secondary" type="button" onClick={() => setChapterOverrideDraft(null)}>Cancel</button>
@@ -881,6 +925,22 @@ function BudgetPageContent({ chapterRows, chapterOverrides, reloadChapters }: {
          </div>
        </form>}
      </Dialog>
+      <Dialog
+        open={!!markerDecisionDraft}
+        title={markerDecisionDraft ? `Marker decision for ${markerDecisionDraft.line.code || markerDecisionDraft.line.item}` : 'Marker decision'}
+        subtitle="A marker changes the Premium calculation. Record the reason and date for this decision."
+        onClose={() => setMarkerDecisionDraft(null)}
+      >
+        {markerDecisionDraft && <form className="form-grid" onSubmit={saveMarkerDecision}>
+          <Field label="Marker"><input value={markerLabels[markerDecisionDraft.marker]} readOnly/></Field>
+          <Field label="Decision date"><input type="date" required value={markerDecisionDraft.decidedOn} onChange={event => setMarkerDecisionDraft(current => current ? { ...current, decidedOn: event.target.value } : current)}/></Field>
+          <Field label="Reason (required)" wide><textarea required rows={3} value={markerDecisionDraft.decisionReason} onChange={event => setMarkerDecisionDraft(current => current ? { ...current, decisionReason: event.target.value } : current)} placeholder="Why does this line use this marker?"/></Field>
+          <div className="form-actions">
+            <button className="button button-secondary" type="button" onClick={() => setMarkerDecisionDraft(null)}>Cancel</button>
+            <button className="button button-primary" type="submit" disabled={updateMarker.isPending}>{updateMarker.isPending ? 'Saving…' : 'Save marker decision'}<ArrowRight size={15}/></button>
+          </div>
+        </form>}
+      </Dialog>
   </div>;
 }
 
@@ -1019,6 +1079,7 @@ function QuotesPage() {
   if (query.isError || linksQuery.isError || linesQuery.isError || extrasQuery.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
     <PageHeader eyebrow="WORKSPACE / DOCUMENT REVIEW" title="Quotes & documents" description="Review supplier proposals alongside the source file and folder they came from." action={<button className="button button-primary" onClick={openCreate}><Plus size={16}/> Add document</button>}/>
+    <div className="data-footnote"><ShieldCheck size={14}/> Imported snapshot · Drive listing. Vendor and category are inferred from file and folder names.</div>
     <div className="review-banner"><div className="review-banner-icon"><FileCheck2 size={19}/></div><div><strong>{dashboard.data?.quotesNeedingReview ?? quotes.filter(q => q.status === 'needs_review').length} documents need a closer look</strong><span>Check the linked proposal and enter its price before relying on the record.</span></div><div className="banner-count">{quotes.length.toString().padStart(2, '0')}<small>FILES</small></div></div>
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
     <section className="panel quotes-panel">
@@ -1039,7 +1100,7 @@ function QuotesPage() {
           return <article key={quote.id} className={`quote-row fade-up ${quote.status === 'needs_review' ? 'quote-needs-review' : ''}`} style={{ animationDelay: `${index * 35}ms` }} data-testid={`card-quote-${quote.id}`}>
             <div className="file-icon"><FileText size={19}/><span>{quote.documentType === 'proposal' ? 'PDF' : quote.documentType.slice(0,3).toUpperCase()}</span></div>
             <div className="quote-details">
-              <div className="quote-title-line"><h3>{quote.fileName}</h3><StatusPill kind="quote" value={quote.status}/></div>
+              <div className="quote-title-line"><h3>{quote.fileName}</h3><StatusPill kind="quote" value={quote.status}/><span className="pill neutral">Imported snapshot</span></div>
               <div className="quote-meta"><span>{quote.vendor || 'Vendor not identified'}</span><i/><span>{quote.category}</span>{quote.buildingType && <><i/><span>{quote.buildingType}</span></>}</div>
               <div className="quote-note">{quote.note || 'No review note added.'}</div>
               <div className="quote-note">{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
@@ -1110,7 +1171,7 @@ function SourcesPage() {
     {chapterSeedStatus.isError && <div className="inline-message" role="status">Could not check chapter seed status.</div>}
     <section className="source-hero"><div className="source-hero-copy"><div className="eyebrow">LINKED MATERIAL</div><h2>Good decisions<br/>start with <em>good sources.</em></h2><p>Open the original working documents whenever a number or assumption needs context.</p></div><div className="source-hero-graphic"><div className="folder-illustration"><div className="folder-tab"/><div className="folder-sheet sheet-one"/><div className="folder-sheet sheet-two"><span/><span/><span/></div><div className="folder-front"><div className="folder-emblem"><Link2 size={22}/></div></div></div><div className="source-orbit orbit-a"/><div className="source-orbit orbit-b"/><span className="orbit-node node-a"><FileSpreadsheet size={14}/></span><span className="orbit-node node-b"><FileText size={14}/></span></div></section>
     <div className="source-section-head"><div><div className="eyebrow">DRIVE LIBRARY</div><h2>Linked files & folders <span>{files.length.toString().padStart(2,'0')}</span></h2></div><div className="source-search"><Search size={15}/><input placeholder="Find a source…" aria-label="Search sources" value={query} onChange={e => setQuery(e.target.value)}/></div></div>
-    <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div><div className="source-card-foot"><span>Last checked: {formatDate(source.lastCheckedAt)}</span><span>Status: {source.status ? titleCase(source.status) : 'Not checked'}</span></div><button className="button button-secondary button-small" type="button" disabled={checkingSourceId !== null} onClick={() => { void checkSource(source.id); }}>{checkingSourceId === source.id ? 'Checking…' : 'Check connection'}</button>{(checkErrors[source.id] || source.status === 'error') && <p role="alert">{checkErrors[source.id] || 'Drive access failed on the last check.'}</p>}{source.sourceType === 'folder' && source.itemCount !== null && <details open><summary className="source-card-foot">{source.itemCount} direct children</summary><div className="building-list">{source.children.map((child, childIndex) => <div className="building-row" key={`${child.name}-${childIndex}`}><span className="building-index">{String(childIndex + 1).padStart(2, '0')}</span><div className="building-name"><strong>{child.name}</strong><span>{child.type} · {formatDate(child.modifiedTime)}</span></div></div>)}</div></details>}</article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>
+     <div className="source-grid">{filtered.map((source, i) => { const Icon = sourceIcon(source.sourceType); return <article className="source-card fade-up" style={{ animationDelay: `${i * 55}ms` }} key={source.id} data-testid={`card-source-${source.id}`}><div className="source-card-top"><span className="source-type-icon"><Icon size={18}/></span><span className="source-type">{titleCase(source.sourceType)}</span><a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name}`} className="icon-button small"><ExternalLink size={14}/></a></div><h3>{source.name}</h3><span className="pill neutral">Imported snapshot</span><p>{source.note || 'No additional notes provided.'}</p><div className="source-card-foot"><span><Link2 size={13}/> Linked source</span><a href={source.url} target="_blank" rel="noreferrer">Open in Drive <ArrowUpRight size={13}/></a></div><div className="source-card-foot"><span>Last checked: {formatDate(source.lastCheckedAt)}</span><span>Status: {source.status ? titleCase(source.status) : 'Not checked'}</span></div>{source.snapshotVerifiedOn && <div className="quote-note"><div>Snapshot verified: {source.snapshotVerifiedOn}</div><div>Snapshot Drive modified: {source.snapshotDriveModifiedTime ? new Date(source.snapshotDriveModifiedTime).toISOString() : '—'}</div><div>Snapshot drift: <strong>{source.snapshotDriftStatus || '—'}</strong></div></div>}<button className="button button-secondary button-small" type="button" disabled={checkingSourceId !== null} onClick={() => { void checkSource(source.id); }}>{checkingSourceId === source.id ? 'Checking…' : 'Check connection'}</button>{(checkErrors[source.id] || source.status === 'error') && <p role="alert">{checkErrors[source.id] || 'Drive access failed on the last check.'}</p>}{source.sourceType === 'folder' && source.itemCount !== null && <details open><summary className="source-card-foot">{source.itemCount} direct children</summary><div className="building-list">{source.children.map((child, childIndex) => <div className="building-row" key={`${child.name}-${childIndex}`}><span className="building-index">{String(childIndex + 1).padStart(2, '0')}</span><div className="building-name"><strong>{child.name}</strong><span>{child.type} · {formatDate(child.modifiedTime)}</span></div></div>)}</div></details>}</article>; })}{!filtered.length && <EmptyState icon={Folder} title="No sources found" body={files.length ? 'Try another search phrase.' : 'Linked Drive files and folders will appear here when provided.'}/>}</div>
     <div className="building-head"><div><div className="eyebrow">REFERENCE INDEX</div><h2>Building types</h2><p>Architecture references remain separate from the CSV's Eco, Standard, and Premium price tiers.</p></div><span className="building-count">{types.length.toString().padStart(2,'0')} REFERENCES</span></div>
     <div className="building-list">{types.map((project, i) => <article className="building-row" key={project.id} data-testid={`row-building-type-${project.id}`}><span className="building-index">{String(i+1).padStart(2,'0')}</span><div className="building-symbol"><HardHat size={17}/></div><div className="building-name"><strong>{project.name}</strong><span>Building type reference</span></div><a href={project.sourceUrl} target="_blank" rel="noreferrer" className="button button-secondary button-small">Open reference <ExternalLink size={13}/></a></article>)}{!types.length && <EmptyState icon={BookOpen} title="No building types linked" body="The building-type index appears when project references are available."/>}</div>
     <div className="source-note"><ShieldCheck size={16}/><div><strong>Traceability stays intact</strong><span>Source names, URLs, and notes are displayed as provided. References are not modified here.</span></div></div>

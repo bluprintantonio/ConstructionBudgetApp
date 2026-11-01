@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, inArray, isNotNull, like } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { calculatePackTotals } from "@workspace/engine/packs";
+import { getSnapshotDriftStatus } from "@workspace/engine/provenance";
 import {
   db,
   budgetLinesTable,
-  budgetMetaTable,
   budgetQuotesTable,
   capChaptersTable,
   extrasTable,
@@ -66,22 +66,14 @@ import {
 } from "@workspace/api-zod";
 import {
   buildingTypes,
-  seedMaterials,
-  seedQuotes,
-  sourceSeedRows,
   sources,
   seedExtras,
-  lineMarkerSeedRows,
-  initialLineMarkerAssignments,
-  toQuoteRow,
 } from "../lib/budget-seed";
+import { ensureBudgetSeedData as ensureSeedData } from "../lib/budget-data-seed";
 import { getChapterSeedStatus } from "../lib/chapter-seed";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
-let seedPromise: Promise<void> | undefined;
-let extrasSeedPromise: Promise<void> | undefined;
-let lineMarkerSeedPromise: Promise<void> | undefined;
 
 type DriveFileMetadata = {
   name?: string;
@@ -179,149 +171,16 @@ async function readDriveSource(source: typeof sourcesTable.$inferSelect) {
   };
 }
 
-async function ensureSeedData(): Promise<void> {
-  if (!seedPromise) {
-    seedPromise = (async () => {
-      const [sourcesSeedMarker] = await db
-        .select({ id: budgetMetaTable.id })
-        .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "sources-v1"))
-        .limit(1);
-      if (!sourcesSeedMarker) {
-        await db.transaction(async (tx) => {
-          await tx
-            .insert(sourcesTable)
-            .values(sourceSeedRows)
-            .onConflictDoNothing();
-          await tx
-            .insert(budgetMetaTable)
-            .values({ id: "sources-v1" })
-            .onConflictDoNothing();
-        });
-      }
-
-      const [quoteSeedMarker] = await db
-        .select({ id: budgetMetaTable.id })
-        .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "boxes-quotes-v1"))
-        .limit(1);
-      if (!quoteSeedMarker) {
-        await db.transaction(async (tx) => {
-          await tx
-            .insert(budgetQuotesTable)
-            .values(seedQuotes.map(toQuoteRow))
-            .onConflictDoNothing();
-          await tx
-            .insert(budgetMetaTable)
-            .values({ id: "boxes-quotes-v1" })
-            .onConflictDoNothing();
-        });
-      }
-
-      const [materialsSeedMarker] = await db
-        .select({ id: budgetMetaTable.id })
-        .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "materials-map-v1"))
-        .limit(1);
-      if (!materialsSeedMarker) {
-        await db.transaction(async (tx) => {
-          await tx
-            .delete(budgetLinesTable)
-            .where(like(budgetLinesTable.id, "src-%"));
-          await tx
-            .insert(budgetLinesTable)
-            .values(seedMaterials)
-            .onConflictDoNothing();
-          await tx
-            .insert(budgetMetaTable)
-            .values({ id: "materials-map-v1" })
-            .onConflictDoNothing();
-        });
-      }
-
-      const [provenanceSeedMarker] = await db
-        .select({ id: budgetMetaTable.id })
-        .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "budget-line-provenance-v1"))
-        .limit(1);
-      if (!provenanceSeedMarker) {
-        await db.transaction(async (tx) => {
-          await tx
-            .update(budgetLinesTable)
-            .set({ sourceId: "materials-master", origin: "imported" })
-            .where(isNotNull(budgetLinesTable.sourceRow));
-          await tx
-            .insert(budgetMetaTable)
-            .values({ id: "budget-line-provenance-v1" })
-            .onConflictDoNothing();
-        });
-      }
-    })();
-  }
-  await seedPromise;
-  await ensureLineMarkerSeedData();
-}
-
-async function ensureLineMarkerSeedData(): Promise<void> {
-  if (!lineMarkerSeedPromise) {
-    lineMarkerSeedPromise = (async () => {
-      await db.transaction(async (tx) => {
-        await tx
-          .insert(lineMarkersTable)
-          .values(lineMarkerSeedRows)
-          .onConflictDoNothing();
-        const [newAssignmentSeed] = await tx
-          .insert(budgetMetaTable)
-          .values({ id: "line-markers-not-applicable-v1" })
-          .onConflictDoNothing()
-          .returning({ id: budgetMetaTable.id });
-        if (newAssignmentSeed) {
-          for (const assignment of initialLineMarkerAssignments) {
-            await tx
-              .insert(lineMarkersTable)
-              .values(assignment)
-              .onConflictDoUpdate({
-                target: lineMarkersTable.budgetLineCode,
-                set: { marker: assignment.marker },
-              });
-          }
-        }
-      });
-    })();
-  }
-  await lineMarkerSeedPromise;
-}
-
-async function ensureExtrasSeedData(): Promise<void> {
-  if (!extrasSeedPromise) {
-    extrasSeedPromise = (async () => {
-      const [seedMarker] = await db
-        .select({ id: budgetMetaTable.id })
-        .from(budgetMetaTable)
-        .where(eq(budgetMetaTable.id, "pack-extras-v1"))
-        .limit(1);
-      if (!seedMarker) {
-        await db.transaction(async (tx) => {
-          await tx.insert(extrasTable).values(seedExtras).onConflictDoNothing();
-          await tx
-            .insert(budgetMetaTable)
-            .values({ id: "pack-extras-v1" })
-            .onConflictDoNothing();
-        });
-      }
-    })();
-  }
-  await extrasSeedPromise;
-}
-
 function serializeLine(
   line: typeof budgetLinesTable.$inferSelect,
   sourceUrl: string | null,
-  marker: typeof lineMarkersTable.$inferSelect.marker,
+  marker: typeof lineMarkersTable.$inferSelect | null,
 ) {
   return {
     ...line,
-    marker,
+    marker: marker?.marker ?? "common",
+    markerDecisionReason: marker?.decisionReason ?? null,
+    markerDecidedOn: marker?.decidedOn ?? null,
     sourceUrl,
     createdAt: line.createdAt.toISOString(),
     updatedAt: line.updatedAt.toISOString(),
@@ -339,14 +198,14 @@ async function serializeLines(
     sourceRows.map((source) => [source.id, source.driveUrl]),
   );
   const markers = new Map(
-    markerRows.map((marker) => [marker.budgetLineCode, marker.marker]),
+    markerRows.map((marker) => [marker.budgetLineCode, marker]),
   );
 
   return lines.map((line) =>
     serializeLine(
       line,
       line.sourceId ? (sourceUrls.get(line.sourceId) ?? null) : null,
-      line.code ? (markers.get(line.code) ?? "common") : "common",
+      line.code ? (markers.get(line.code) ?? null) : null,
     ),
   );
 }
@@ -367,6 +226,17 @@ function serializeSource(source: typeof sourcesTable.$inferSelect) {
     sourceType: source.type === "csv" ? "spreadsheet" : "folder",
     url: source.driveUrl,
     note: source.description,
+    snapshotVerifiedOn: source.snapshotVerifiedOn,
+    snapshotDriveModifiedTime:
+      source.snapshotDriveModifiedTime?.toISOString() ?? null,
+    snapshotDriftStatus: source.snapshotVerifiedOn
+      ? getSnapshotDriftStatus({
+          snapshotDriveModifiedTime:
+            source.snapshotDriveModifiedTime?.toISOString() ?? null,
+          driveModifiedTime: source.driveModifiedTime?.toISOString() ?? null,
+          lastCheckedAt: source.lastCheckedAt?.toISOString() ?? null,
+        })
+      : null,
     driveModifiedTime: source.driveModifiedTime?.toISOString() ?? null,
     lastCheckedAt: source.lastCheckedAt?.toISOString() ?? null,
     status: source.status,
@@ -452,7 +322,7 @@ function quoteValues(
 }
 
 router.get("/budget/dashboard", async (_req, res): Promise<void> => {
-  await Promise.all([ensureSeedData(), ensureExtrasSeedData()]);
+  await ensureSeedData();
   const [lines, extras, quotes, markerRows] = await Promise.all([
     db.select().from(budgetLinesTable),
     db.select().from(extrasTable),
@@ -689,6 +559,7 @@ router.get("/budget/projects", async (_req, res): Promise<void> => {
 });
 
 router.get("/budget/sources", async (_req, res): Promise<void> => {
+  await ensureSeedData();
   const sourceRows = await db.select().from(sourcesTable);
   const sourceOrder = new Map<string, number>(
     sources.map((source, index) => [source.id, index]),
@@ -832,12 +703,14 @@ router.put(
         budgetLineCode: params.data.budgetLineCode,
         chapterCode: parsed.data.chapterCode,
         reason: parsed.data.reason.trim(),
+        decidedOn: parsed.data.decidedOn,
       })
       .onConflictDoUpdate({
         target: lineChapterOverridesTable.budgetLineCode,
         set: {
           chapterCode: parsed.data.chapterCode,
           reason: parsed.data.reason.trim(),
+          decidedOn: parsed.data.decidedOn,
         },
       })
       .returning();
@@ -908,10 +781,16 @@ router.patch(
       .values({
         budgetLineCode: params.data.budgetLineCode,
         marker: parsed.data.marker,
+        decisionReason: parsed.data.decisionReason.trim(),
+        decidedOn: parsed.data.decidedOn,
       })
       .onConflictDoUpdate({
         target: lineMarkersTable.budgetLineCode,
-        set: { marker: parsed.data.marker },
+        set: {
+          marker: parsed.data.marker,
+          decisionReason: parsed.data.decisionReason.trim(),
+          decidedOn: parsed.data.decidedOn,
+        },
       })
       .returning();
     res.json(UpdateBudgetLineMarkerResponse.parse(marker));
@@ -919,7 +798,7 @@ router.patch(
 );
 
 router.get("/budget/extras", async (_req, res): Promise<void> => {
-  await ensureExtrasSeedData();
+  await ensureSeedData();
   const extras = await db.select().from(extrasTable);
   const order = new Map(seedExtras.map((extra, index) => [extra.id, index]));
   extras.sort(
@@ -933,7 +812,7 @@ router.get("/budget/extras", async (_req, res): Promise<void> => {
 router.patch(
   "/budget/extras/:extraId",
   async (req, res): Promise<void> => {
-    await ensureExtrasSeedData();
+    await ensureSeedData();
     const params = UpdateBudgetExtraParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
