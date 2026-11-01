@@ -6,7 +6,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, ClipboardList, ExternalLink, FileCheck2,
   FileSpreadsheet, FileText, Folder, HardHat, LayoutDashboard, Link2, Menu, MoreHorizontal,
   Plus, RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, UploadCloud,
-  X, AlertCircle, Pencil, Landmark
+  X, AlertCircle, Pencil, Landmark, Leaf, Zap, ChevronRight
 } from 'lucide-react';
 import {
   BudgetExtra, BudgetExtraUpdate, BudgetLine, BudgetQuote, BudgetQuoteLink, BudgetLineInput, BudgetQuoteInput,
@@ -76,6 +76,24 @@ function QuoteWarningLabels({ warnings }: { warnings: QuoteWarnings }) {
     ? <strong role="alert">Warning: {labels.join(' · ')}</strong>
     : null;
 }
+
+type PackId = 'standard' | 'eco' | 'premium';
+const readPackFromUrl = (): PackId => {
+  const pack = new URLSearchParams(window.location.search).get('pack');
+  return pack === 'eco' || pack === 'premium' ? pack : 'standard';
+};
+const materialsPacks: { id: PackId; label: string; icon: typeof Activity; source: string }[] = [
+  { id: 'standard', label: 'Standard', icon: Activity, source: 'Standard unit price' },
+  { id: 'eco', label: 'Eco', icon: Leaf, source: 'Standard unit price + Eco extras' },
+  { id: 'premium', label: 'Premium', icon: Zap, source: 'Markers + Premium extras' },
+];
+const markerLabels: Record<NonNullable<BudgetLine['marker']>, string> = {
+  common: 'Common',
+  finishings: 'Finishings',
+  equipment: 'Equipment',
+  systems: 'Systems',
+  not_applicable: 'Not applicable',
+};
 
 function parseCsvRows(input: string): string[][] {
   const firstLine = input.split(/\r?\n/, 1)[0] || '';
@@ -365,10 +383,18 @@ function BudgetPage() {
   const extrasQuery = useGetBudgetExtras(); const updateExtra = useUpdateBudgetExtra();
   const quotesQuery = useGetBudgetQuotes(); const quoteLinksQuery = useGetBudgetQuoteLinks();
   const { currencyCode } = useCurrency();
+  const [, setLocation] = useLocation();
   const create = useCreateBudgetLine(); const update = useUpdateBudgetLine(); const remove = useDeleteBudgetLine(); const importer = useImportBudgetLines();
   const updateMarker = useUpdateBudgetLineMarker();
   const [search, setSearch] = useState(''); const [chapterFilter, setChapterFilter] = useState('all'); const [editing, setEditing] = useState<BudgetLine | null>(null); const [createOpen, setCreateOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [importText, setImportText] = useState(''); const [message, setMessage] = useState('');
   const [extraDrafts, setExtraDrafts] = useState<Record<string, ExtraDraft>>({});
+  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(() => new Set());
+  const [selectedPack, setSelectedPack] = useState<PackId>(readPackFromUrl);
+  useEffect(() => {
+    const syncPackFromUrl = () => setSelectedPack(readPackFromUrl());
+    window.addEventListener('popstate', syncPackFromUrl);
+    return () => window.removeEventListener('popstate', syncPackFromUrl);
+  }, []);
   const lines = [...(query.data || [])].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a.code || '', b.code || ''));
   const quoteComparisons = useMemo(() => calculateQuoteComparisons(
     quotesQuery.data || [],
@@ -379,7 +405,25 @@ function BudgetPage() {
   const quotesById = new Map((quotesQuery.data || []).map(quote => [quote.id, quote]));
   const chapters = useMemo(() => [...new Set(lines.map(line => line.category))].sort((a, b) => new Intl.Collator('pt', { numeric: true }).compare(a, b)), [lines]);
   const filtered = useMemo(() => lines.filter(line => (chapterFilter === 'all' || line.category === chapterFilter) && `${line.code || ''} ${line.category} ${line.item} ${line.unit || ''}`.toLowerCase().includes(search.toLowerCase())), [lines, chapterFilter, search]);
-  const packMetrics = dashboard.data?.sourceMetrics || [];
+  const packTotals = useMemo(
+    () => query.data && extrasQuery.data ? calculatePackTotals(query.data, extrasQuery.data) : null,
+    [query.data, extrasQuery.data],
+  );
+  const chapterGroups = useMemo(() => {
+    const grouped = new Map<string, BudgetLine[]>();
+    filtered.forEach(line => grouped.set(line.category, [...(grouped.get(line.category) || []), line]));
+    return [...grouped.entries()].map(([name, chapterLines]) => {
+      const match = name.match(/^(CAP\.\s*\d+)\s*(.*)$/i);
+      const totals = calculatePackTotals(chapterLines, []);
+      return {
+        name,
+        code: match?.[1] || name,
+        title: match?.[2] || '',
+        lines: chapterLines,
+        total: totals[selectedPack].total,
+      };
+    });
+  }, [filtered, selectedPack]);
   const premiumReconciliation = useMemo(
     () => calculatePackTotals(lines, []).premiumReconciliation,
     [lines],
@@ -459,18 +503,72 @@ function BudgetPage() {
   };
   const confirmDelete = (line: BudgetLine) => { if (window.confirm(`Remove “${line.item}” from the app's material map? The Drive source will not be changed.`)) remove.mutate({ lineId: line.id }, { onSuccess: () => { setMessage('Material removed from the app.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); } }); };
   const importRows = (e: FormEvent) => { e.preventDefault(); try { const parsed = parseBudgetCsv(importText); importer.mutate({ data: parsed }, { onSuccess: () => { setImportOpen(false); setImportText(''); setMessage('Master rows imported.'); void client.invalidateQueries({ queryKey: getGetBudgetLinesQueryKey() }); void client.invalidateQueries({ queryKey: getGetBudgetDashboardQueryKey() }); }, onError: () => setMessage('The CSV could not be imported. Check the master headers and try again.') }); } catch (error) { setMessage(error instanceof Error ? error.message : 'CSV could not be read.'); } };
+  const toggleChapter = (chapter: string) => setCollapsedChapters(current => {
+    const next = new Set(current);
+    if (next.has(chapter)) next.delete(chapter);
+    else next.add(chapter);
+    return next;
+  });
+  const selectPack = (pack: PackId) => {
+    setSelectedPack(pack);
+    void setLocation(`/budget?pack=${pack}`);
+  };
+  const renderLineRow = (line: BudgetLine) => {
+    const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
+    const marker = line.marker || 'common';
+    return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
+      <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
+      <td className="marker-cell"><span className="marker-tag" data-marker={marker}>{markerLabels[marker]}</span><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={marker} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(value => <option key={value} value={value}>{value === 'not_applicable' ? 'Not applicable in Premium' : titleCase(value)}</option>)}</select></label></td>
+      <td className="material-chapter">{line.category}</td>
+      <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
+        const quote = quotesById.get(comparison.quoteId);
+        if (!quote) return null;
+        const targetCodes = comparison.budgetLineCodes.join(', ');
+        return <div className="quote-note" key={quote.id} data-testid={`comparison-line-${line.code}-${quote.id}`}>
+          <div><a href={quote.driveUrl || quote.sourceUrl} target="_blank" rel="noreferrer">{quote.fileName}</a>{comparison.lowest && <strong> · lowest</strong>}</div>
+          <div>CSV total for {targetCodes}: {preciseCurrency(comparison.csvTotal, currencyCode)} · Quote: {preciseCurrency(quote.amount, currencyCode)}</div>
+          <div>Difference: {preciseCurrency(comparison.difference, currencyCode)} · {comparison.differencePercent == null ? '—' : `${comparison.differencePercent.toFixed(2)}%`}</div>
+          <div>{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
+          <QuoteWarningLabels warnings={comparison.warnings}/>
+        </div>;
+      })}</td>
+      <td>{line.unit || '—'}</td>
+      <td className="money-cell">{line.quantity ?? '—'}</td>
+      <td className={`material-scenario${selectedPack === 'eco' ? ' selected-pack-column' : ''}`} data-pack-price="eco"><small>Unit: {currency(line.ecoUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.ecoTotal, currencyCode)}</strong></td>
+      <td className={`material-scenario${selectedPack === 'standard' ? ' selected-pack-column' : ''}`} data-pack-price="standard"><small>Unit: {currency(line.standardUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.standardTotal, currencyCode)}</strong></td>
+      <td className={`material-scenario${selectedPack === 'premium' ? ' selected-pack-column' : ''}`} data-pack-price="premium"><small>Unit: {currency(line.premiumUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.premiumTotal, currencyCode)}</strong></td>
+      <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
+    </tr>;
+  };
   if (query.isLoading) return <LoadingBlock/>; if (query.isError) return <ErrorBlock onRetry={reload}/>;
   return <div>
-     <PageHeader eyebrow="WORKSPACE / MASTER MAP" title="Materials & quantities" description="Coded items from the master CSV, with Eco, Standard, and Premium price tiers." action={<div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines, extrasQuery.data || [])} disabled={!lines.length || extrasQuery.isLoading || extrasQuery.isError}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div>}/>
+      <section className="materials-hero">
+        <div className="materials-hero-copy"><div className="eyebrow">WORKSPACE / MASTER MAP</div><h1>Materials &amp; quantities</h1><p>Source quantities and pack pricing, organized by chapter.</p></div>
+        <div className="materials-hero-actions"><div className="materials-toggle-slot" aria-hidden="true"/><div className="heading-actions"><button className="button button-secondary" onClick={() => downloadBudgetCsv(lines, extrasQuery.data || [])} disabled={!lines.length || extrasQuery.isLoading || extrasQuery.isError}><FileSpreadsheet size={15}/> Export CSV</button><button className="button button-secondary" onClick={() => setImportOpen(true)}><UploadCloud size={15}/> Import master</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={16}/> Add material</button></div></div>
+      </section>
      <div className="register-strip"><div className="register-stat"><strong>{dashboard.data?.lineCount ?? lines.length}</strong><span>MASTER ITEMS</span></div><div className="register-stat"><strong>{chapters.length}</strong><span>CHAPTERS</span></div><div className="register-stat strip-note"><ShieldCheck size={17}/><span>Zero values and all three source tiers are preserved exactly.</span></div></div>
      <div className="data-footnote"><SlidersHorizontal size={14}/> Changing a marker changes the Premium total. Lines without a saved marker count as Common.</div>
-     {packMetrics.length > 0 && <><div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2>Pack totals</h2></div></div><div className="metrics-grid">{packMetrics.map((metric, i) => <MetricTile key={metric.id} {...metric} icon={[Activity, Landmark, ArrowDownRight][i % 3]} index={i} currencyCode={currencyCode}/>)}</div></>}
+      <section className="materials-pack-section" aria-labelledby="materials-pack-heading">
+        <div className="section-heading"><div><div className="eyebrow">ONE HOUSE UNIT / PACK ENGINE</div><h2 id="materials-pack-heading">Pack totals</h2></div></div>
+        {packTotals ? <div className="materials-pack-grid" role="group" aria-label="Select a pack">
+          {materialsPacks.map(({ id, label, icon: Icon, source }) => {
+            const pack = packTotals[id];
+            return <button type="button" key={id} className={`materials-pack-card${selectedPack === id ? ' is-selected' : ''}`} data-pack={id} data-testid={`button-material-pack-${id}`} aria-pressed={selectedPack === id} onClick={() => selectPack(id)}>
+              <div className="materials-pack-top"><span className="materials-pack-icon"><Icon size={17}/></span><span className="materials-pack-source">{source}</span></div>
+              <strong className="materials-pack-total" data-testid={`text-material-pack-total-${id}`}>{currency(pack.total, currencyCode)}</strong>
+              <span className="materials-pack-name">{label}</span>
+              <span className="materials-pack-breakdown">From CSV lines: {currency(pack.fromCsvLines, currencyCode)} · from extras: {currency(pack.fromExtras, currencyCode)}</span>
+              {pack.pendingExtraCount > 0 && <span className="pill attention">{pack.pendingExtraCount} {pack.pendingExtraCount === 1 ? 'extra' : 'extras'} pending a price</span>}
+            </button>;
+          })}
+        </div> : <div className="panel materials-load-note">Loading pack totals…</div>}
+      </section>
      {lines.length > 0 && <section className="panel register-panel">
-       <div className="register-toolbar"><div><div className="eyebrow">PREMIUM RECONCILIATION</div><h2>CSV Premium to app Premium lines</h2></div></div>
-       <div className="register-strip">
-         <div className="register-stat"><strong>{currency(premiumReconciliation.csvPremiumTotal, currencyCode)}</strong><span>CSV Premium total (all lines at their CSV Premium price)</span></div>
-         <div className="register-stat"><strong>−{currency(premiumReconciliation.commonUpliftRemoved, currencyCode)}</strong><span>Premium uplift removed on Common lines (Premium price &gt; Standard price)</span></div>
-         <div className="register-stat"><strong>{currency(premiumReconciliation.premiumLinesUsedByApp, currencyCode)}</strong><span>Premium lines used by the app (plus extras)</span></div>
+        <div className="register-toolbar"><div><div className="eyebrow">PREMIUM RECONCILIATION</div><h2>CSV Premium to app Premium lines</h2></div></div>
+        <div className="reconciliation-summary">
+          <div className="reconciliation-stat"><strong>{currency(premiumReconciliation.csvPremiumTotal, currencyCode)}</strong><span>CSV Premium total (all lines at their CSV Premium price)</span></div>
+          <div className="reconciliation-stat"><strong>−{currency(premiumReconciliation.commonUpliftRemoved, currencyCode)}</strong><span>Premium uplift removed on Common lines (Premium price &gt; Standard price)</span></div>
+          <div className="reconciliation-stat"><strong>{currency(premiumReconciliation.premiumLinesUsedByApp, currencyCode)}</strong><span>Premium lines used by the app (plus extras)</span></div>
        </div>
        <div className="table-scroll scrollbar-thin"><table className="data-table budget-table">
          <thead><tr><th>CODE</th><th>DESCRIPTION</th><th>QTY</th><th>STANDARD PRICE</th><th>PREMIUM PRICE</th><th>DIFFERENCE</th></tr></thead>
@@ -487,40 +585,32 @@ function BudgetPage() {
     {message && <div className="inline-message"><Check size={15}/>{message}<button onClick={() => setMessage('')} aria-label="Dismiss message"><X size={14}/></button></div>}
      {(quotesQuery.isError || quoteLinksQuery.isError) && <div className="inline-message"><AlertCircle size={15}/>Quote comparisons could not be loaded. Refresh to try again.</div>}
     <section className="panel register-panel">
-      <div className="register-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
-      <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div><div className="table-scroll scrollbar-thin"><table className="data-table budget-table materials-table"><thead><tr><th>CODE</th><th>MARKER</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th>ECO</th><th>STANDARD</th><th>PREMIUM</th><th/></tr></thead><tbody>
-       {filtered.map(line => {
-         const lineQuotes = quoteComparisons.filter(comparison => line.code != null && comparison.budgetLineCodes.includes(line.code));
-         return <tr key={line.id} data-testid={`row-budget-line-${line.id}`}>
-           <td><span className="material-code">{line.code || '—'}</span>{line.origin === 'imported' && line.sourceRow != null && line.sourceUrl && <a className="material-source-tag" href={line.sourceUrl} target="_blank" rel="noreferrer">CSV row {line.sourceRow}</a>}</td>
-           <td><label className="form-field"><select aria-label={`Marker for ${line.code || line.item}`} style={{ minWidth: 126 }} value={line.marker || 'common'} disabled={!line.code || updateMarker.isPending} onChange={event => saveMarker(line, event.target.value as BudgetLine['marker'])}>{(['common', 'finishings', 'equipment', 'systems', 'not_applicable'] as BudgetLine['marker'][]).map(marker => <option key={marker} value={marker}>{marker === 'not_applicable' ? 'Not applicable in Premium' : titleCase(marker)}</option>)}</select></label></td>
-           <td className="material-chapter">{line.category}</td>
-           <td><strong>{line.item}</strong>{lineQuotes.map(comparison => {
-             const quote = quotesById.get(comparison.quoteId);
-             if (!quote) return null;
-             const targetCodes = comparison.budgetLineCodes.join(', ');
-             return <div className="quote-note" key={quote.id} data-testid={`comparison-line-${line.code}-${quote.id}`}>
-               <div><a href={quote.driveUrl || quote.sourceUrl} target="_blank" rel="noreferrer">{quote.fileName}</a>{comparison.lowest && <strong> · lowest</strong>}</div>
-               <div>CSV total for {targetCodes}: {preciseCurrency(comparison.csvTotal, currencyCode)} · Quote: {preciseCurrency(quote.amount, currencyCode)}</div>
-               <div>Difference: {preciseCurrency(comparison.difference, currencyCode)} · {comparison.differencePercent == null ? '—' : `${comparison.differencePercent.toFixed(2)}%`}</div>
-               <div>{quote.priceScope} · {titleCase(quote.scopeType)} · VAT {titleCase(quote.vatIncluded)} · Valid until {shortDate(quote.validityDate)}</div>
-               <QuoteWarningLabels warnings={comparison.warnings}/>
-             </div>;
-           })}</td>
-           <td>{line.unit || '—'}</td>
-           <td className="money-cell">{line.quantity ?? '—'}</td>
-           <td className="material-scenario"><small>Unit: {currency(line.ecoUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.ecoTotal, currencyCode)}</strong></td>
-           <td className="material-scenario"><small>Unit: {currency(line.standardUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.standardTotal, currencyCode)}</strong></td>
-           <td className="material-scenario"><small>Unit: {currency(line.premiumUnitPrice, currencyCode)} / {line.unit || 'unit'}</small><strong>Total: {currency(line.premiumTotal, currencyCode)}</strong></td>
-           <td><div className="row-actions"><button className="icon-button small" title="Edit material" aria-label={`Edit ${line.code || line.item}`} onClick={() => setEditing(line)}><Pencil size={14}/></button><button className="icon-button small danger-hover" title="Remove material" aria-label={`Remove ${line.item}`} onClick={() => confirmDelete(line)}><Trash2 size={14}/></button></div></td>
-         </tr>;
-       })}
-      {!filtered.length && <tr><td colSpan={10}><EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/></td></tr>}
-      </tbody></table></div>
-      <div className="table-footer"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
-    </section>
+       <div className="register-toolbar materials-lines-toolbar"><div className="search-box"><Search size={16}/><input aria-label="Search materials" data-testid="input-search-budget-lines" placeholder="Search code, chapter, material…" value={search} onChange={e => setSearch(e.target.value)}/></div><div className="toolbar-controls"><SlidersHorizontal size={15}/><select aria-label="Filter by chapter" value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} data-testid="select-budget-chapter"><option value="all">All chapters</option>{chapters.map(chapter => <option value={chapter} key={chapter}>{chapter}</option>)}</select><button className="icon-button" title="Refresh" onClick={reload}><RefreshCw size={16}/></button></div></div>
+       <div className="table-footer materials-count"><span>Showing {filtered.length} of {lines.length} materials</span><span><span className="footer-dot"/>Master source retained</span></div>
+       <div className="chapter-list">
+         {chapterGroups.map(group => {
+           const collapsed = collapsedChapters.has(group.name);
+           return <article className="chapter-card" key={group.name} data-testid={`card-material-chapter-${group.code.replaceAll(' ', '-').toLowerCase()}`}>
+             <button className="chapter-card-header" type="button" aria-expanded={!collapsed} onClick={() => toggleChapter(group.name)}>
+               <span className={`chapter-chevron${collapsed ? '' : ' is-open'}`}><ChevronRight size={17}/></span>
+               <span className="chapter-title"><strong>{group.code}</strong><span>{group.title}</span></span>
+               <span className="chapter-count">{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'}</span>
+               <span className="chapter-total" data-pack={selectedPack}><small>{materialsPacks.find(pack => pack.id === selectedPack)?.label}</small><strong>{currency(group.total, currencyCode)}</strong></span>
+             </button>
+             {!collapsed && <div className="table-scroll scrollbar-thin">
+               <div className="mobile-table-hint">Swipe horizontally to compare all three price tiers.</div>
+               <table className="data-table budget-table materials-table" data-selected-pack={selectedPack}>
+                 <thead><tr><th>CODE</th><th>MARKER</th><th>CHAPTER</th><th>MATERIAL / DESCRIPTION</th><th>UNIT</th><th>QTY</th><th data-pack-price="eco">ECO</th><th data-pack-price="standard">STANDARD</th><th data-pack-price="premium">PREMIUM</th><th/></tr></thead>
+                 <tbody>{group.lines.map(renderLineRow)}</tbody>
+               </table>
+             </div>}
+           </article>;
+         })}
+         {!chapterGroups.length && <EmptyState icon={ClipboardList} title={lines.length ? 'No matching materials' : 'Master map is ready'} body={lines.length ? 'Try another code or chapter.' : 'Import the master quantity CSV to populate the materials map.'} action={!lines.length ? <button className="text-link" onClick={() => setImportOpen(true)}>Import master CSV <ArrowRight size={14}/></button> : undefined}/>}
+       </div>
+     </section>
     <section className="panel register-panel">
-      <div className="register-toolbar"><strong>Extras</strong><span className="source-ref">Unit price is the total for one complete item.</span></div>
+       <div className="register-toolbar extras-toolbar"><div><div className="eyebrow">PACK OPTIONS</div><h2>Extras</h2></div><span className="source-ref">Unit price is the total for one complete item.</span></div>
       {extrasQuery.isLoading ? <div className="table-footer">Loading extras…</div> : extrasQuery.isError ? <div className="inline-message"><AlertCircle size={15}/>Could not load extras.<button className="text-link" onClick={() => void extrasQuery.refetch()}>Retry</button></div> : <div className="table-scroll scrollbar-thin"><table className="data-table">
          <thead><tr><th>EXTRA</th><th>PACKS</th><th>QTY</th><th>UNIT</th><th>PRICE SCOPE</th><th>UNIT PRICE · COMPLETE ITEM</th><th>PRICE STATUS</th><th>NOTES</th><th>LINKED QUOTES</th><th/></tr></thead>
         <tbody>{(extrasQuery.data || []).map(extra => {
@@ -531,8 +621,8 @@ function BudgetPage() {
             <td><label className="form-field"><input aria-label={`${extra.name} quantity`} data-testid={`input-extra-quantity-${extra.id}`} type="number" min="0" step="1" value={draft.quantity} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { quantity: event.target.value })}/></label></td>
             <td data-testid={`text-extra-unit-${extra.id}`}>{extra.unit}</td>
             <td data-testid={`text-extra-price-scope-${extra.id}`}>{extra.priceScope}</td>
-            <td><label className="form-field"><input aria-label={`${extra.name} complete item price`} data-testid={`input-extra-unit-price-${extra.id}`} type="number" min="0" step="0.01" placeholder="—" value={draft.unitPrice} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { unitPrice: event.target.value })}/></label>{extra.unitPrice == null && !draft.unitPrice.trim() && <small className="source-ref" data-testid={`status-extra-price-pending-${extra.id}`}>Price pending</small>}</td>
-            <td><label className="form-field"><select aria-label={`${extra.name} price status`} data-testid={`select-extra-status-${extra.id}`} value={draft.priceStatus} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { priceStatus: event.target.value as BudgetExtra['priceStatus'] })}>{(['estimate', 'quoted', 'pending'] as BudgetExtra['priceStatus'][]).map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></label></td>
+             <td><label className="form-field"><input aria-label={`${extra.name} complete item price`} data-testid={`input-extra-unit-price-${extra.id}`} type="number" min="0" step="0.01" placeholder="—" value={draft.unitPrice} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { unitPrice: event.target.value })}/></label>{extra.unitPrice == null && !draft.unitPrice.trim() && <span className="pill attention extra-price-badge" data-testid={`status-extra-price-pending-${extra.id}`}>Price pending</span>}</td>
+             <td><div className="extra-status-stack"><span className={`pill ${draft.priceStatus === 'quoted' ? 'good' : draft.priceStatus === 'estimate' ? 'neutral' : 'attention'}`}>{titleCase(draft.priceStatus)}</span><label className="form-field"><select aria-label={`${extra.name} price status`} data-testid={`select-extra-status-${extra.id}`} value={draft.priceStatus} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { priceStatus: event.target.value as BudgetExtra['priceStatus'] })}>{(['estimate', 'quoted', 'pending'] as BudgetExtra['priceStatus'][]).map(status => <option key={status} value={status}>{titleCase(status)}</option>)}</select></label></div></td>
             <td><label className="form-field"><input aria-label={`${extra.name} notes`} data-testid={`input-extra-notes-${extra.id}`} value={draft.notes} disabled={updateExtra.isPending} onChange={event => changeExtraDraft(extra, { notes: event.target.value })}/></label></td>
            <td>{quoteComparisons.filter(comparison => comparison.extraIds.includes(extra.id)).map(comparison => {
              const quote = quotesById.get(comparison.quoteId);
