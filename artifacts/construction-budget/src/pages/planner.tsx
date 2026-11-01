@@ -297,6 +297,23 @@ function formatCurrency(value: number | null, code: CurrencyCode): string {
   }).format(value);
 }
 
+function formatSalePriceField(value: string): string {
+  if (value.trim() === "") return "";
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return value;
+  return new Intl.NumberFormat("pt-PT", {
+    maximumFractionDigits: 20,
+  }).format(numericValue);
+}
+
+function formatSalePricePerSquareMeter(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("pt-PT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function formatPercent(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat("pt-PT", {
@@ -776,7 +793,9 @@ export default function PlannerPage({
   return (
     <div className="planner-page">
       {pageHeader}
-      <section className="planner-choice-section" aria-label="House types">
+      <div className="planner-content-stack">
+       <div className="planner-choice-stack">
+        <section className="planner-choice-section" aria-label="House types">
         <div className="planner-section-caption"><span>01</span> SELECT HOUSE TYPE</div>
         <div className="planner-choice-line">
           <div className="planner-house-type-tabs" role="tablist" aria-label="Choose a house type">
@@ -824,7 +843,7 @@ export default function PlannerPage({
         </div>
       )}
 
-      <section className="planner-choice-section planner-pack-choice" aria-label="Estimate pack">
+        <section className="planner-choice-section planner-pack-choice" aria-label="Estimate pack">
         <div className="planner-section-caption"><span>02</span> CHOOSE FINISHING PACK</div>
         <div className="planner-choice-line">
           <div className="planner-pack-tabs" role="tablist" aria-label="Choose a pack">
@@ -853,11 +872,11 @@ export default function PlannerPage({
           </div>
           {renderViewActionButton("prices", "row")}
         </div>
-      </section>
-
-      <div className="planner-mobile-view-actions" role="group" aria-label="Planner views">
-        {plannerViewActions.map(({ id }) => renderViewActionButton(id, "mobile"))}
-      </div>
+          <div className="planner-mobile-view-actions" role="group" aria-label="Planner views">
+            {plannerViewActions.map(({ id }) => renderViewActionButton(id, "mobile"))}
+          </div>
+        </section>
+       </div>
 
       {selectedResult && selectedPresentation && selectedPackTotal && (
         <div
@@ -883,7 +902,7 @@ export default function PlannerPage({
           </section>
 
           <div className="planner-analysis-grid">
-              <section className="planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
+              <section className="planner-board planner-assumptions" id="planner-house-type-panel" aria-labelledby={`planner-house-type-tab-${selectedHouseTypeId}`}>
                 <div className="planner-section-title">
                   <div><div className="planner-section-caption"><span>03</span> SAVED INPUTS</div><h2>Planning assumptions</h2></div>
                   <span className="pill attention"><i />ASSUMPTION</span>
@@ -926,7 +945,7 @@ export default function PlannerPage({
 
             <div className="planner-view-host" id="planner-view-content">
               {selectedView === "waterfall" && (
-                <section className="panel planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
+                <section className="panel planner-board planner-waterfall" data-pack={selectedPack} aria-labelledby="planner-waterfall-heading">
                   <div className="planner-card-heading">
                     <div><div className="planner-section-caption"><span>04</span> COST BREAKDOWN</div><h2 id="planner-waterfall-heading">Cost waterfall</h2></div>
                     <span className="planner-pack-badge" data-pack={selectedPack}>{packDefinitions.find((pack) => pack.id === selectedPack)?.label}</span>
@@ -949,7 +968,7 @@ export default function PlannerPage({
 
               {selectedView === "outcomes" && (
                 <div className="planner-view-stack">
-                  <section className="panel planner-comparison" aria-labelledby="planner-comparison-heading">
+                  <section className="panel planner-board planner-comparison" aria-labelledby="planner-comparison-heading">
                     <div className="planner-section-title"><div><div className="planner-section-caption"><span>04</span> PACK OUTCOMES</div><h2 id="planner-comparison-heading">All three pack outcomes</h2></div></div>
                     <div className="planner-comparison-grid">
                       {plannerPacks.map((pack) => (
@@ -968,7 +987,7 @@ export default function PlannerPage({
                     </div>
                   </section>
 
-                  <section className="panel planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
+                  <section className="panel planner-board planner-house-type-comparison" aria-labelledby="planner-house-type-comparison-heading">
                     <div className="planner-section-title"><div><div className="planner-section-caption"><span>05</span> HOUSE TYPE COMPARISON</div><h2 id="planner-house-type-comparison-heading">Compare house types</h2></div></div>
                     <div className="planner-house-type-table-wrap">
                       <table className="planner-house-type-table">
@@ -992,7 +1011,7 @@ export default function PlannerPage({
               )}
 
               {selectedView === "prices" && (
-                <section className="panel planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
+                <section className="panel planner-board planner-sale-prices" aria-labelledby="planner-sale-prices-heading">
                   <div className="planner-sale-prices-header">
                     <div><div className="planner-section-caption"><span>04</span> REFERENCE VALUES</div><h2 id="planner-sale-prices-heading">Sale prices</h2><p>One house unit · keep a source note beside each reference.</p></div>
                     <span className="pill attention"><i />ASSUMPTION</span>
@@ -1003,7 +1022,7 @@ export default function PlannerPage({
                         <thead><tr><th scope="col">House type</th>{packDefinitions.map(({ id, label }) => <th scope="col" key={id}>{label}</th>)}</tr></thead>
                         <tbody>
                           {salePriceMatrixRows.map(({ houseType, saved, salePrices, metrics }) => (
-                            <tr key={houseType.id}>
+                            <tr className={houseType.id === selectedHouseTypeId ? "is-selected" : undefined} key={houseType.id}>
                               <th scope="row"><span>{houseType.name}</span>{houseType.costBasis === "Twin CSV (provisional)" && <small>PROVISIONAL</small>}</th>
                               {packDefinitions.map(({ id, label }) => {
                                 const cell = salePrices[id];
@@ -1011,12 +1030,12 @@ export default function PlannerPage({
                                 return (
                                   <td key={id}>
                                     <div className="planner-sale-price-cell">
-                                      <label className="planner-sale-price-input-label"><span className="sr-only">{houseType.name} {label} sale price</span><span className="planner-sale-currency">{currencyCode === "EUR" ? "€" : currencyCode === "GBP" ? "£" : "$"}</span><input type="number" min="0" step="0.01" value={cell.price} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "price", event.target.value)} /></label>
-                                      <label className="planner-sale-price-note-label"><span className="sr-only">{houseType.name} {label} price source note</span><input type="text" placeholder="Estimate, comparable sale, offer received" value={cell.note} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "note", event.target.value)} /></label>
+                                      <label className="planner-sale-price-input-label"><span className="sr-only">{houseType.name} {label} sale price</span><span className="planner-sale-currency">{currencyCode === "EUR" ? "€" : currencyCode === "GBP" ? "£" : "$"}</span><input type="number" min="0" step="0.01" value={cell.price} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "price", event.target.value)} /><span className="planner-sale-price-display" aria-hidden="true">{formatSalePriceField(cell.price)}</span></label>
+                                      <label className="planner-sale-price-note-label"><span className="sr-only">{houseType.name} {label} price source note</span><input type="text" placeholder="Source note" title="Estimate, comparable sale, offer received" value={cell.note} onChange={(event) => updateSalePriceDraftCell(houseType.id, id, "note", event.target.value)} /></label>
                                       {dirty && <span className="planner-sale-price-unsaved">Unsaved</span>}
                                       <div className="planner-sale-price-metrics">
-                                        <span>ROI<strong>{formatPercent(metrics[id].roi)}</strong>{houseType.costBasis === "Twin CSV (provisional)" && <span className="pill attention planner-provisional-roi"><i />PROVISIONAL</span>}</span>
-                                        <span>Sale price / m²<strong>{formatCurrency(metrics[id].salePricePerSquareMeter, currencyCode)}</strong></span>
+                                        <span className="planner-sale-price-metric"><span>ROI</span><strong>{formatPercent(metrics[id].roi)}</strong>{houseType.costBasis === "Twin CSV (provisional)" && metrics[id].roi !== null && <span className="planner-provisional-mark" title="Provisional cost basis" aria-label="Provisional cost basis">*</span>}</span>
+                                        <span className="planner-sale-price-metric"><span>€/m²</span><strong>{formatSalePricePerSquareMeter(metrics[id].salePricePerSquareMeter)}</strong></span>
                                       </div>
                                     </div>
                                   </td>
@@ -1064,6 +1083,7 @@ export default function PlannerPage({
           </section>
         </div>
       )}
+      </div>
     </div>
   );
 }

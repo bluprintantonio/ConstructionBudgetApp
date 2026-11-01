@@ -55,6 +55,7 @@
   --app-radius-12: 12px;
   --app-radius-asymmetric: 17px 17px 17px 5px;
   --app-radius-round: 50%;
+  --app-gap-board: 20px;
   --app-shadow-hero: 0 12px 26px rgba(22, 34, 52, .13);
   --app-shadow-soft: 0 4px 16px rgba(43, 54, 62, .035);
   --background: 42 33% 95%;
@@ -1190,7 +1191,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .planner-sale-prices {
-  margin: 0 0 18px;
+  margin: 0;
   overflow: hidden;
 }
 .planner-sale-prices-header {
@@ -1382,6 +1383,10 @@ a { color: inherit; text-decoration: none; }
   background: color-mix(in srgb, var(--app-surface) 5.5%, transparent);
 }
 .planner-page .planner-choice-section { display: grid; gap: 10px; }
+.planner-page .planner-content-stack,
+.planner-page .planner-choice-stack,
+.planner-page .planner-panel { display: grid; min-width: 0; gap: var(--app-gap-board); }
+.planner-page .planner-panel { align-content: start; }
 .planner-page .planner-section-caption { display: flex; align-items: center; gap: 9px; color: var(--app-muted); }
 .planner-page .planner-section-caption > span {
   display: inline-grid;
@@ -1431,7 +1436,7 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-house-type-tab > span { font: 600 14px var(--app-font-display); }
 .planner-page .planner-house-type-tab small { color: var(--app-warning); font: 8px var(--app-font-mono); letter-spacing: .06em; }
 .planner-page .planner-provisional-banner {
-  margin: -12px 0 0;
+  margin: 0;
   padding: 9px 12px;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-8);
@@ -1499,18 +1504,15 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-kpi-label { color: var(--app-muted); font-size: 9px; line-height: 1.25; }
 .planner-page .planner-kpi-value { display: block; overflow: hidden; margin: 3px 0 0; color: var(--app-navy); font: 700 clamp(18px,2.1vw,24px)/1.1 var(--app-font-display); letter-spacing: -.04em; text-overflow: ellipsis; white-space: nowrap; }
 .planner-page .planner-kpi > small { margin-top: 3px; color: var(--app-muted); font-size: 8px; }
-.planner-page .planner-analysis-grid { display: grid; grid-template-columns: minmax(290px,.85fr) minmax(0,1.45fr); align-items: start; gap: 13px; }
-.planner-page .planner-assumptions,
-.planner-page .planner-waterfall,
-.planner-page .planner-viability,
-.planner-page .planner-house-type-comparison,
-.planner-page .planner-sale-prices {
+.planner-page .planner-analysis-grid { display: grid; grid-template-columns: minmax(290px,.85fr) minmax(0,1.45fr); align-items: start; gap: var(--app-gap-board); }
+.planner-page .planner-board,
+.planner-page .planner-viability {
   min-width: 0;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-10);
   background: var(--app-surface);
 }
-.planner-page .planner-assumptions { padding: 17px; }
+.planner-page .planner-board { padding: 18px; box-shadow: var(--app-shadow-soft); }
 .planner-page .planner-section-title,
 .planner-page .planner-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .planner-page .planner-section-title h2,
@@ -1536,7 +1538,6 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-form-footer > span { color: var(--app-muted); font-size: 9px; }
 .planner-page .planner-form-footer .button { min-height: 34px; font-size: 10px; }
 .planner-page .inline-message { margin: 12px 0 0; }
-.planner-page .planner-waterfall { padding: 18px; }
 .planner-page .planner-card-heading { margin-bottom: 15px; }
 .planner-page .planner-pack-badge { padding: 6px 9px; border-radius: var(--app-radius-6); color: var(--app-muted); background: color-mix(in srgb, var(--app-border) 45%, var(--app-surface)); font: 9px var(--app-font-mono); }
 .planner-page .planner-waterfall-section + .planner-waterfall-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--app-border); }
@@ -1570,7 +1571,8 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-assumption-warning { display: flex; align-items: center; gap: 6px; color: var(--app-warning); font-size: 9px; }
 .planner-page .planner-assumption-warning svg { color: var(--app-standard); }
 .planner-page .planner-comparison { display: grid; gap: 12px; }
-.planner-page .planner-comparison-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.planner-page .planner-comparison .planner-section-caption > span { background: transparent; }
+.planner-page .planner-comparison-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
 .planner-page .planner-comparison-card { min-width: 0; padding: 15px; border: 1px solid var(--app-border); border-top: 3px solid var(--planner-pack-color); border-radius: var(--app-radius-10); background: var(--app-surface); }
 .planner-page .planner-comparison-card[data-pack="standard"] { --planner-pack-color: var(--app-standard); }
 .planner-page .planner-comparison-card[data-pack="eco"] { --planner-pack-color: var(--app-eco); }
@@ -1584,28 +1586,44 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-comparison-values > div { display: flex; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid var(--app-border); }
 .planner-page .planner-comparison-values span { color: var(--app-muted); font-size: 9px; }
 .planner-page .planner-comparison-values strong { color: var(--app-text); font: 9px var(--app-font-mono); text-align: right; }
-.planner-page .planner-sale-prices,
-.planner-page .planner-house-type-comparison { padding: 19px; }
 .planner-page .planner-sale-prices-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 0 0 14px; }
 .planner-page .planner-sale-prices-header h2 { font-size: 19px; }
 .planner-page .planner-sale-prices-header p { margin: 6px 0 0; color: var(--app-muted); font-size: 10px; }
 .planner-page .planner-sale-price-table-wrap,
 .planner-page .planner-house-type-table-wrap { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
-.planner-page .planner-sale-price-table { min-width: 760px; }
+.planner-page .planner-sale-price-table-wrap { overflow-x: hidden; }
+.planner-page .planner-sale-price-table { width: 100%; min-width: 0; table-layout: fixed; }
+.planner-page .planner-sale-price-table thead th:first-child,
+.planner-page .planner-sale-price-table tbody th { width: 16%; }
+.planner-page .planner-sale-price-table thead th:not(:first-child),
+.planner-page .planner-sale-price-table tbody td { width: 28%; }
 .planner-page .planner-sale-price-table th,
-.planner-page .planner-sale-price-table td { border-color: var(--app-border); }
+.planner-page .planner-sale-price-table td { padding: 8px 10px; border-color: var(--app-border); }
 .planner-page .planner-sale-price-table thead th,
 .planner-page .planner-house-type-table thead th { background: color-mix(in srgb, var(--app-border) 45%, var(--app-surface)); color: var(--app-muted); font: 9px var(--app-font-mono); }
-.planner-page .planner-sale-price-table tbody th { min-width: 126px; color: var(--app-text); font: 600 10px var(--app-font-display); }
-.planner-page .planner-sale-price-table tbody th small { display: block; margin-top: 4px; color: var(--app-warning); font: 7px var(--app-font-mono); }
-.planner-page .planner-sale-price-cell { min-width: 188px; }
-.planner-page .planner-sale-price-input-label { display: flex; align-items: center; height: 34px; border: 1px solid var(--app-border); border-radius: var(--app-radius-6); background: var(--app-surface); }
+.planner-page .planner-sale-price-table tbody th { min-width: 0; color: var(--app-text); font: 600 10px var(--app-font-display); }
+.planner-page .planner-sale-price-table tbody th small { display: inline-block; margin-top: 4px; padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--app-warning) 28%, var(--app-border)); border-radius: var(--app-radius-6); color: var(--app-warning); background: var(--app-standard-tint); font: 7px var(--app-font-mono); letter-spacing: .025em; }
+.planner-page .planner-sale-price-table tbody th small { max-width: 100%; overflow-wrap: anywhere; }
+.planner-page .planner-sale-price-table tbody tr.is-selected { background: var(--app-standard-tint); }
+.planner-page .planner-sale-price-cell { min-width: 0; gap: 6px; }
 .planner-page .planner-sale-currency { padding-left: 9px; color: var(--app-muted); font: 10px var(--app-font-mono); }
-.planner-page .planner-sale-price-input-label input { min-width: 0; height: 32px; border: 0; font: 10px var(--app-font-mono); }
-.planner-page .planner-sale-price-note-label input { height: 29px; margin-top: 5px; border: 1px solid var(--app-border); border-radius: var(--app-radius-6); background: var(--app-surface); font-size: 9px; }
-.planner-page .planner-sale-price-metrics { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--app-muted); font-size: 8px; }
-.planner-page .planner-sale-price-metrics > span { display: grid; gap: 4px; }
-.planner-page .planner-sale-price-metrics strong { color: var(--app-text); font: 9px var(--app-font-mono); }
+.planner-page .planner-sale-price-input-label { position: relative; display: flex; align-items: center; box-sizing: border-box; width: 100%; min-width: 0; height: 34px; overflow: hidden; border: 1px solid var(--app-border); border-radius: var(--app-radius-6); background: var(--app-surface); }
+.planner-page .planner-sale-currency { flex: 0 0 auto; }
+.planner-page .planner-sale-price-input-label input { position: relative; z-index: 1; box-sizing: border-box; flex: 1 1 auto; width: 0; min-width: 0; min-height: 0; height: 32px; padding: 0 9px 0 3px; border: 0; color: transparent; background: transparent; font: 10px var(--app-font-mono); text-align: right; appearance: textfield; -moz-appearance: textfield; }
+.planner-page .planner-sale-price-input-label input::-webkit-inner-spin-button,
+.planner-page .planner-sale-price-input-label input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.planner-page .planner-sale-price-input-label:focus-within { border-color: var(--app-standard); }
+.planner-page .planner-sale-price-input-label:focus-within input { color: var(--app-text); }
+.planner-page .planner-sale-price-display { position: absolute; z-index: 2; top: 50%; right: 9px; left: 36px; overflow: hidden; color: var(--app-text); font: 10px var(--app-font-mono); text-align: right; text-overflow: clip; white-space: nowrap; transform: translateY(-50%); pointer-events: none; }
+.planner-page .planner-sale-price-input-label:focus-within .planner-sale-price-display { display: none; }
+.planner-page .planner-sale-price-note-label { display: block; width: 100%; min-width: 0; }
+.planner-page .planner-sale-price-note-label input { box-sizing: border-box; width: 100%; height: 29px; margin-top: 5px; padding: 5px 8px; border: 1px solid var(--app-border); border-radius: var(--app-radius-6); background: var(--app-surface); font-size: 8px; white-space: nowrap; }
+.planner-page .planner-sale-price-note-label input::placeholder { font-size: 8px; }
+.planner-page .planner-sale-price-metrics { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px; color: var(--app-muted); font-size: 9px; white-space: nowrap; }
+.planner-page .planner-sale-price-metrics > span { display: inline-flex; min-width: 0; align-items: baseline; gap: 4px; }
+.planner-page .planner-sale-price-metrics > span > span:first-child { color: var(--app-muted); }
+.planner-page .planner-sale-price-metrics strong { margin: 0; color: var(--app-text); font: 9px var(--app-font-mono); text-align: right; white-space: nowrap; }
+.planner-page .planner-provisional-mark { color: var(--app-warning); font: 700 9px var(--app-font-mono); cursor: help; }
 .planner-page .planner-sale-price-unsaved { display: inline-block; margin-top: 5px; color: var(--app-warning); font: 8px var(--app-font-mono); }
 .planner-page .planner-sale-price-actions { justify-content: flex-end; margin-top: 13px; padding: 0; }
 .planner-page .planner-sale-prices .inline-message { margin: 11px 0 0; }
@@ -1671,9 +1689,9 @@ a { color: inherit; text-decoration: none; }
 .planner-page .planner-view-action-indicators { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: var(--app-warning); }
 .planner-page .planner-view-unsaved-dot { width: 7px; height: 7px; border-radius: var(--app-radius-round); background: var(--app-warning); }
 .planner-page .planner-mobile-view-actions { display: none; }
-.planner-page .planner-view-host { display: grid; min-width: 0; align-content: start; gap: 12px; }
+.planner-page .planner-view-host { display: grid; min-width: 0; align-content: start; }
 .planner-page .planner-view-host > * { min-width: 0; }
-.planner-page .planner-view-stack { display: grid; min-width: 0; gap: 12px; }
+.planner-page .planner-view-stack { display: grid; min-width: 0; gap: var(--app-gap-board); }
 .planner-page .planner-view-stack > .panel { min-width: 0; }
 @media (max-width: 1100px) {
   .planner-page .planner-choice-line { grid-template-columns: minmax(0,1fr); }
@@ -1687,6 +1705,7 @@ a { color: inherit; text-decoration: none; }
   .planner-page .planner-choice-line > .planner-pack-tabs { max-width: 720px; }
 }
 @media (max-width: 760px) {
+  :root { --app-gap-board: 14px; }
   .planner-page { gap: 16px; }
   .planner-page .planner-hero { min-height: 118px; padding: 20px 17px; }
   .planner-page .planner-hero-mark { width: 44px; height: 44px; }
@@ -1703,10 +1722,7 @@ a { color: inherit; text-decoration: none; }
   .planner-page .planner-view-action-mobile { min-height: 56px; grid-template-columns: 24px minmax(0,1fr) auto; gap: 6px; padding: 8px 9px; font-size: 10px; }
   .planner-page .planner-view-action-mobile .planner-view-action-icon { width: 24px; height: 24px; }
   .planner-page .planner-view-action-mobile .planner-view-action-indicators { gap: 4px; }
-  .planner-page .planner-assumptions,
-  .planner-page .planner-waterfall,
-  .planner-page .planner-sale-prices,
-  .planner-page .planner-house-type-comparison { padding: 14px; }
+  .planner-page .planner-board { padding: 14px; }
   .planner-page .planner-viability { padding: 16px; }
 }
 @media (max-width: 430px) {
@@ -1725,6 +1741,11 @@ a { color: inherit; text-decoration: none; }
   .planner-page .planner-analysis-grid:has(.planner-house-type-comparison) > .planner-view-host { grid-column: 1 / -1; }
 }
 @media (max-width: 639px) {
+  .planner-page .planner-sale-price-table-wrap { overflow-x: auto; overflow-y: hidden; }
+  .planner-page .planner-sale-price-table { width: 760px; min-width: 760px; max-width: none; }
+  .planner-page .planner-sale-price-table thead th:first-child { position: sticky; left: 0; z-index: 3; background: color-mix(in srgb, var(--app-border) 45%, var(--app-surface)); }
+  .planner-page .planner-sale-price-table tbody th { position: sticky; left: 0; z-index: 2; padding: 8px 10px; background: var(--app-surface); }
+  .planner-page .planner-sale-price-table tbody tr.is-selected th { background: var(--app-standard-tint); }
   .planner-page .planner-house-type-table-wrap { overflow-x: auto; overflow-y: hidden; }
   .planner-page .planner-house-type-table { width: 800px; min-width: 800px; max-width: none; }
   .planner-page .planner-house-type-table thead th:nth-child(1),
