@@ -118,6 +118,8 @@ export interface PlannerInputs {
   /** @nullable */
   land: number | null;
   /** @nullable */
+  plotArea: number | null;
+  /** @nullable */
   designLicensing: number | null;
   /** @nullable */
   managementPercent: number | null;
@@ -150,6 +152,8 @@ export interface PlannerInputsUpdate {
   grossArea: number | null;
   /** @nullable */
   land: number | null;
+  /** @nullable */
+  plotArea: number | null;
   /** @nullable */
   designLicensing: number | null;
   /** @nullable */

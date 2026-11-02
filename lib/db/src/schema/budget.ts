@@ -193,6 +193,7 @@ export const plannerInputsTable = pgTable("planner_inputs", {
   landNote: text("land_note"),
   grossArea: real("gross_area"),
   land: real("land"),
+  plotArea: real("plot_area"),
   designLicensing: real("design_licensing"),
   managementPercent: real("management_percent"),
   contingencyPercent: real("contingency_percent"),

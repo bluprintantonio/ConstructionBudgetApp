@@ -14,6 +14,8 @@ export interface PlannerInputsUpdate {
   /** @nullable */
   land: number | null;
   /** @nullable */
+  plotArea: number | null;
+  /** @nullable */
   designLicensing: number | null;
   /** @nullable */
   managementPercent: number | null;

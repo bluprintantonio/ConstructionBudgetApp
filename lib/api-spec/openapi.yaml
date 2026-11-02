@@ -604,6 +604,7 @@ components:
         landNote: { type: ["string", "null"] }
         grossArea: { type: ["number", "null"] }
         land: { type: ["number", "null"] }
+        plotArea: { type: ["number", "null"] }
         designLicensing: { type: ["number", "null"] }
         managementPercent: { type: ["number", "null"] }
         contingencyPercent: { type: ["number", "null"] }
@@ -616,20 +617,21 @@ components:
         priceNoteStandard: { type: ["string", "null"] }
         priceNoteEco: { type: ["string", "null"] }
         priceNotePremium: { type: ["string", "null"] }
-      required: [houseTypeId, landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice, priceNoteStandard, priceNoteEco, priceNotePremium]
+      required: [houseTypeId, landNote, grossArea, land, plotArea, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent, standardReferenceSellingPrice, ecoReferenceSellingPrice, premiumReferenceSellingPrice, priceNoteStandard, priceNoteEco, priceNotePremium]
     PlannerInputsUpdate:
       type: object
       properties:
         landNote: { type: ["string", "null"] }
         grossArea: { type: ["number", "null"] }
         land: { type: ["number", "null"] }
+        plotArea: { type: ["number", "null"] }
         designLicensing: { type: ["number", "null"] }
         managementPercent: { type: ["number", "null"] }
         contingencyPercent: { type: ["number", "null"] }
         targetNetMarginPercent: { type: ["number", "null"] }
         salesCommissionPercent: { type: ["number", "null"] }
         taxesPercent: { type: ["number", "null"] }
-      required: [landNote, grossArea, land, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent]
+      required: [landNote, grossArea, land, plotArea, designLicensing, managementPercent, contingencyPercent, targetNetMarginPercent, salesCommissionPercent, taxesPercent]
     PlannerSalePriceRow:
       type: object
       properties:

@@ -43,7 +43,7 @@ import {
 } from "@workspace/engine/planner";
 
 type CurrencyCode = "EUR" | "GBP" | "USD";
-type PlannerField = Exclude<keyof PlannerInputsUpdate, "landNote">;
+type PlannerField = Exclude<keyof PlannerInputsUpdate, "landNote" | "plotArea">;
 type PlannerDraft = Record<PlannerField, string>;
 
 const fieldDefinitions: {
@@ -226,6 +226,7 @@ function draftFromInputs(inputs?: PlannerInputs): PlannerDraft {
 function inputsFromDraft(
   draft: PlannerDraft,
   landNote: string,
+  plotArea: string,
 ): PlannerInputsUpdate {
   const parseValue = (value: string) =>
     value.trim() === "" ? null : Number(value);
@@ -233,6 +234,7 @@ function inputsFromDraft(
     landNote: landNote.trim() === "" ? null : landNote,
     grossArea: parseValue(draft.grossArea),
     land: parseValue(draft.land),
+    plotArea: parseValue(plotArea),
     designLicensing: parseValue(draft.designLicensing),
     managementPercent: parseValue(draft.managementPercent),
     contingencyPercent: parseValue(draft.contingencyPercent),
@@ -246,7 +248,11 @@ function engineInputsFromUpdate(
   inputs: PlannerInputsUpdate,
   salePrices: SalePriceDraft,
 ): HouseTypePlannerInputs {
-  const { landNote: _landNote, ...engineInputs } = inputs;
+  const {
+    landNote: _landNote,
+    plotArea: _plotArea,
+    ...engineInputs
+  } = inputs;
   return {
     ...engineInputs,
     standardReferenceSellingPrice: nullableNumber(salePrices.standard.price),
@@ -337,6 +343,7 @@ export default function PlannerPage({
   const [, setLocation] = useLocation();
   const [draft, setDraft] = useState<PlannerDraft>(emptyDraft);
   const [landNote, setLandNote] = useState("");
+  const [plotArea, setPlotArea] = useState("");
   const [notice, setNotice] = useState("");
   const [saveError, setSaveError] = useState("");
   const [salePriceDrafts, setSalePriceDrafts] = useState<SalePriceDrafts>({});
@@ -385,6 +392,7 @@ export default function PlannerPage({
     if (hydratedHouseTypeId.current === selectedHouseTypeId) return;
     setDraft(draftFromInputs(savedInputs));
     setLandNote(savedInputs?.landNote ?? "");
+    setPlotArea(savedInputs?.plotArea == null ? "" : String(savedInputs.plotArea));
     setNotice("");
     setSaveError("");
     hydratedHouseTypeId.current = selectedHouseTypeId;
@@ -409,8 +417,8 @@ export default function PlannerPage({
   }, [houseTypesQuery.data, inputsQuery.data, inputsQuery.isLoading]);
 
   const inputs = useMemo(
-    () => inputsFromDraft(draft, landNote),
-    [draft, landNote],
+    () => inputsFromDraft(draft, landNote, plotArea),
+    [draft, landNote, plotArea],
   );
   const selectedSalePriceDraft =
     salePriceDrafts[selectedHouseTypeId] ??
@@ -648,7 +656,7 @@ export default function PlannerPage({
     const invalid = fieldDefinitions.some(({ key }) => {
       const value = draft[key].trim();
       return value !== "" && !Number.isFinite(Number(value));
-    });
+    }) || (plotArea.trim() !== "" && !Number.isFinite(Number(plotArea)));
     if (invalid) {
       setSaveError("Enter a valid number in each completed field.");
       setNotice("");
@@ -667,6 +675,7 @@ export default function PlannerPage({
         onSuccess: (saved) => {
           setDraft(draftFromInputs(saved));
           setLandNote(saved.landNote ?? "");
+          setPlotArea(saved.plotArea == null ? "" : String(saved.plotArea));
           setNotice("Assumptions saved to the database.");
           void queryClient.invalidateQueries({
             queryKey: getGetPlannerInputsQueryKey(),
@@ -743,8 +752,8 @@ export default function PlannerPage({
   const packIcons = { standard: Sparkles, eco: Leaf, premium: Zap };
   const assumptionGroups: { title: string; keys: PlannerField[]; icon: typeof House }[] = [
     { title: "House profile", keys: ["grossArea"], icon: Ruler },
-    { title: "Land & planning", keys: ["land", "designLicensing"], icon: Building2 },
-    { title: "Fees & reserves", keys: ["managementPercent", "contingencyPercent"], icon: CircleDollarSign },
+    { title: "Land & planning", keys: ["land"], icon: Building2 },
+    { title: "Fees & reserves", keys: ["managementPercent", "contingencyPercent", "designLicensing"], icon: CircleDollarSign },
     { title: "Sale assumptions", keys: ["targetNetMarginPercent", "salesCommissionPercent", "taxesPercent"], icon: Target },
   ];
   const amountForField = (key: PlannerField) => {
@@ -789,6 +798,25 @@ export default function PlannerPage({
       </label>
     );
   };
+  const plotAreaInput = (
+    <label className="planner-assumption-field" key="plotArea">
+      <span className="planner-assumption-label">Land area (m²)<small>ASSUMPTION</small></span>
+      <div className="planner-input-line">
+        <span className="planner-input-prefix">m²</span>
+        <input
+          aria-label="Land area (m²)"
+          type="number"
+          step="any"
+          value={plotArea}
+          onChange={(event) => {
+            setPlotArea(event.target.value);
+            setNotice("");
+            setSaveError("");
+          }}
+        />
+      </div>
+    </label>
+  );
 
   return (
     <div className="planner-page">
@@ -917,6 +945,8 @@ export default function PlannerPage({
                         <h3><Icon size={16} />{title}</h3>
                         {keys.map(fieldInput)}
                         {title === "Land & planning" && (
+                          <>
+                          {plotAreaInput}
                           <label className="planner-assumption-field planner-note-field">
                             <span className="planner-assumption-label">Land source note</span>
                             <input
@@ -930,6 +960,7 @@ export default function PlannerPage({
                               }}
                             />
                           </label>
+                          </>
                         )}
                       </section>
                     ))}
